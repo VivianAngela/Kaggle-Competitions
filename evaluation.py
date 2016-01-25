@@ -129,7 +129,7 @@ def perform_evaluation():
 
         # Compute Weighted AUC of current submission file
         score = compute_Weighted_AUC(groundtruth_label, submission_label)
-        print("%s achieved %.5f." % (os.path.basename(submission_file_path), score))
+        print "%s achieved %.5f." % (os.path.basename(submission_file_path), score)
 
 def combine_submissions():
     """Combine submissions.
