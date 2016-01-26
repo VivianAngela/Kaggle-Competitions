@@ -131,11 +131,11 @@ def perform_evaluation():
         score = compute_Weighted_AUC(groundtruth_label, submission_label)
         print "%s achieved %.5f." % (os.path.basename(submission_file_path), score)
 
-def combine_submissions():
+def combine_submissions(selected_submission_file_name_list):
     """Combine submissions.
     
     Parameters:
-    None.
+    selected_submission_file_name_list -- List, shape = [n_files]. The file names of the selected submission files.
     
     Returns:
     None. The new submission file will be created.
@@ -156,7 +156,6 @@ def combine_submissions():
 
     # Read selected submission files
     selected_submission_ranks_list = []
-    selected_submission_file_name_list = ["01_nobody.csv", "02_chenriwei.csv", "Aurora.csv"]
     for selected_submission_file_name in selected_submission_file_name_list:
         selected_submission_file_path = os.path.join(common.SUBMISSIONS_FOLDER_PATH, selected_submission_file_name)
         selected_submission_file_content = pd.read_csv(selected_submission_file_path, skiprows=0).as_matrix()
@@ -176,5 +175,5 @@ def combine_submissions():
     median_submission_file_content.to_csv(os.path.join(common.SUBMISSIONS_FOLDER_PATH, "median_submission.csv"), index=False, header=True)
 
 if __name__ == "__main__":
-    combine_submissions()
+    # combine_submissions(["01_nobody.csv", "02_chenriwei.csv", "Aurora.csv"])
     perform_evaluation()
