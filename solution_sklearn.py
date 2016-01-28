@@ -25,7 +25,8 @@ def load_feature_from_file(image_paths, facial_image_extension, feature_extensio
     """
 
     feature_list = []
-    feature_file_paths = [image_path + facial_image_extension + feature_extension for image_path in image_paths]
+    feature_file_paths = [image_path + facial_image_extension + feature_extension \
+                          for image_path in image_paths]
 
     for feature_file_path in feature_file_paths:
         # Read feature directly from file
@@ -57,8 +58,10 @@ def load_feature(facial_image_extension, feature_extension):
     image_paths_in_testing_dataset = prepare_data.get_image_paths_in_testing_dataset()
 
     # Load feature from file
-    training_image_feature_list = load_feature_from_file(image_paths_in_training_dataset, facial_image_extension, feature_extension)
-    testing_image_feature_list = load_feature_from_file(image_paths_in_testing_dataset, facial_image_extension, feature_extension)
+    training_image_feature_list = load_feature_from_file(\
+                                                         image_paths_in_training_dataset, facial_image_extension, feature_extension)
+    testing_image_feature_list = load_feature_from_file(\
+                                                        image_paths_in_testing_dataset, facial_image_extension, feature_extension)
 
     # Omit possible None element in training image feature list
     valid_training_image_feature_list = []
@@ -105,7 +108,8 @@ def get_record_map(index_array, true_false_ratio):
     # Perform sampling based on the true_false_ratio
     pair_label_true_indexes = np.where(record_index_pair_label_array)[0]
     pair_label_false_indexes = np.where(~record_index_pair_label_array)[0]
-    selected_pair_label_false_indexes = np.random.choice(pair_label_false_indexes, 1.0 * pair_label_true_indexes.size / true_false_ratio, replace=False)
+    selected_pair_label_false_indexes = np.random.choice(\
+                                                         pair_label_false_indexes, 1.0 * pair_label_true_indexes.size / true_false_ratio, replace=False)
     selected_pair_label_indexes = np.hstack((pair_label_true_indexes, selected_pair_label_false_indexes))
     return (record_index_pair_array[selected_pair_label_indexes, :], record_index_pair_label_array[selected_pair_label_indexes])
 
@@ -171,7 +175,8 @@ def get_best_classifier(image_feature_list, image_index_list):
     print("Evaluating the performance of the classifiers ...")
 
     # Set the parameters for SVC
-    param_grid = [{'C': [1, 10, 100, 1000], 'gamma': ['auto'], 'kernel': ['linear']}, {'C': [1, 10, 100, 1000], 'gamma': [0.001, 0.0001], 'kernel': ['rbf']}]
+    param_grid = [{'C': [1, 10, 100, 1000], 'gamma': ['auto'], 'kernel': ['linear']}, \
+                  {'C': [1, 10, 100, 1000], 'gamma': [0.001, 0.0001], 'kernel': ['rbf']}]
     parameters_combinations = ParameterGrid(param_grid)
 
     # Get a list of different classifiers
@@ -208,7 +213,8 @@ def get_best_classifier(image_feature_list, image_index_list):
     arithmetic_mean = np.mean(score_record, axis=1)
     standard_deviation = np.std(score_record, axis=1)
     best_classifier_index = np.argmax(arithmetic_mean)
-    print("\nThe classifier {:d} achieved best performance with mean score {:.4f} and standard deviation {:.4f}.".format(best_classifier_index, arithmetic_mean[best_classifier_index], standard_deviation[best_classifier_index]))
+    print("\nThe classifier {:d} achieved best performance with mean score {:.4f} and standard deviation {:.4f}.".format(\
+                best_classifier_index, arithmetic_mean[best_classifier_index], standard_deviation[best_classifier_index]))
     print("The optimal parameters are {}.\n".format(parameters_combinations[best_classifier_index]))
 
     return classifier_list[best_classifier_index]
@@ -274,12 +280,14 @@ def make_prediction(facial_image_extension, feature_extension):
     classifier = get_best_classifier(training_image_feature_list, training_image_index_list)
 
     # Generate training data
-    X_train, Y_train = convert_to_final_data_set(training_image_feature_list, training_image_index_list, range(len(training_image_feature_list)), 1)
+    X_train, Y_train = convert_to_final_data_set(\
+                                                 training_image_feature_list, training_image_index_list, range(len(training_image_feature_list)), 1)
     classifier.fit(X_train, Y_train)
 
     # Load testing file
     testing_file_path = os.path.join(common.DATA_PATH, common.TESTING_FILE_NAME)
-    testing_file_content = pd.read_csv(testing_file_path, delimiter=",", engine="c", skiprows=0, na_filter=False, low_memory=False).as_matrix()
+    testing_file_content = pd.read_csv(\
+                                       testing_file_path, delimiter=",", engine="c", skiprows=0, na_filter=False, low_memory=False).as_matrix()
 
     # Generate prediction
     prediction = generate_prediction(classifier, testing_file_content, testing_image_feature_dict)
