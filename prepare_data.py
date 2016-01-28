@@ -199,13 +199,13 @@ def compute_features(facial_image_extension, feature_extension, retrieve_feature
     progress_bar = pyprind.ProgBar(len(facial_image_path_list), monitor=True)
 
     for facial_image_path, feature_file_path in zip(facial_image_path_list, feature_file_path_list):
+        # Update progress bar before the computation
+        progress_bar.update()
+
         # Retrieve feature
         feature = retrieve_feature_func(facial_image_path, feature_file_path)
         if feature is None:
             error_num = error_num + 1
-
-        # Update progress bar
-        progress_bar.update()
 
     # Report tracking information
     print(progress_bar)
