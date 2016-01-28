@@ -37,7 +37,8 @@ def retrieve_facial_image_by_open_face(full_image_path, force_continue=True):
     :type full_image_path: string
     :param force_continue: whether crop facial images by using bbox coordinates
     :type force_continue: boolean
-    :rtype: numpy array, the facial image
+    :return: the facial image
+    :rtype: numpy array
     """
 
     try:
@@ -64,7 +65,8 @@ def retrieve_feature_by_open_face(facial_image_path, feature_file_path):
     :type facial_image_path: string
     :param feature_file_path: the path of the feature file
     :type feature_file_path: string
-    :rtype: numpy array, the deep feature
+    :return: the deep feature
+    :rtype: numpy array
     """
 
     try:

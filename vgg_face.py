@@ -27,7 +27,8 @@ def retrieve_feature_by_vgg_face(facial_image_path, feature_file_path):
     :type facial_image_path: string
     :param feature_file_path: the path of the feature file
     :type feature_file_path: string
-    :rtype: numpy array, the deep feature
+    :return: the deep feature
+    :rtype: numpy array
     """
 
     try:

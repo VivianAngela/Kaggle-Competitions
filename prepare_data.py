@@ -30,8 +30,9 @@ RETRIEVE_FEATURE_FUNC_LIST = [\
 def get_image_paths_in_training_dataset():
     """Get image paths in the training data set.
     
-    :rtype: tuple, original_image_path_list refers to the image path, 
+    :return: original_image_path_list refers to the image path, 
         while training_image_index_list refers to the image index.
+    :rtype: tuple
     """
 
     original_image_path_list = []
@@ -61,7 +62,8 @@ def get_image_paths_in_training_dataset():
 def get_image_paths_in_testing_dataset():
     """Get image paths in the testing data set.
     
-    :rtype: list, original_image_path_list refers to the image path
+    :return: the image paths in the testing data set
+    :rtype: list
     """
 
     original_image_path_list = []
@@ -94,6 +96,7 @@ def crop_facial_images_within_single_dataset(image_paths, facial_image_extension
     :type retrieve_facial_image_func: object
     :param force_continue: whether crop facial images by using bbox coordinates
     :type force_continue: boolean
+    :return: the facial images will be saved to disk
     :rtype: None
     """
 
@@ -152,6 +155,7 @@ def crop_facial_images(facial_image_extension, mean_image_name, retrieve_facial_
     :type mean_image_name: string
     :param retrieve_facial_image_func: the function object that could crop faces
     :type retrieve_facial_image_func: object
+    :return: the facial images will be saved to disk
     :rtype: None
     """
 
@@ -179,6 +183,7 @@ def compute_features(facial_image_extension, feature_extension, retrieve_feature
     :type feature_extension: string
     :param retrieve_feature_func: the function object that could retrieve feature
     :type retrieve_feature_func: object
+    :return: the features will be saved to disk
     :rtype: None
     """
 

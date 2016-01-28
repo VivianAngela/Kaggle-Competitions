@@ -15,7 +15,8 @@ def compute_Weighted_AUC(y_true, y_score, weight_distribution=np.arange(4, -1, -
     :type y_score: numpy array
     :param weight_distribution: the weights of different areas
     :type weight_distribution: numpy array
-    :rtype: float number, the Weighted AUC score
+    :return: the Weighted AUC score
+    :rtype: float
     """
 
     def perform_interpolation(fpr, tpr, threshold_array):
@@ -27,7 +28,8 @@ def compute_Weighted_AUC(y_true, y_score, weight_distribution=np.arange(4, -1, -
         :type tpr: numpy array
         :param threshold_array: the thresholds where interpolation is needed
         :type threshold_array: numpy array
-        :rtype: tuple, the interpolated fpr and tpr
+        :return: the interpolated fpr and tpr
+        :rtype: tuple
         """
 
         for threshold in threshold_array:
@@ -135,7 +137,8 @@ def combine_submissions(selected_submission_file_name_list):
     
     :param selected_submission_file_name_list: the file names of the selected submission files
     :type selected_submission_file_name_list: list
-    :rtype: None, the new submission file will be created
+    :return: the new submission file will be created
+    :rtype: None
     """
 
     def get_ranks(input_array):
@@ -143,7 +146,8 @@ def combine_submissions(selected_submission_file_name_list):
         
         :param input_array: input array
         :type input_array: numpy array
-        :rtype: numpy array, the ranks of the elements
+        :return: the ranks of the elements
+        :rtype: numpy array
         """
 
         order = input_array.argsort()

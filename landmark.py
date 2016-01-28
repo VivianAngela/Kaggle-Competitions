@@ -8,7 +8,8 @@ def retrieve_facial_image_by_bbox(full_image_path, force_continue=True):
     :type full_image_path: string
     :param force_continue: unused argument, for consistency with other functions
     :type force_continue: boolean
-    :rtype: numpy array, the facial image
+    :return: the facial image
+    :rtype: numpy array
     """
 
     try:
