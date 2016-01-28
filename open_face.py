@@ -28,7 +28,7 @@ def init_open_face_module():
     args = parser.parse_args()
 
     align = openface.AlignDlib(args.dlibFacePredictor)
-    net = openface.TorchNeuralNet(args.networkModel, args.imgDim)
+    net = openface.TorchNeuralNet(args.networkModel, args.imgDim, cuda=True)
 
 def retrieve_facial_image_by_open_face(full_image_path, force_continue=True):
     """Retrieve the facial image by using open face.
