@@ -286,14 +286,15 @@ def make_prediction(facial_image_extension, feature_extension):
 
     # Load testing file
     testing_file_path = os.path.join(common.DATA_PATH, common.TESTING_FILE_NAME)
-    testing_file_content = pd.read_csv(\
-                                       testing_file_path, delimiter=",", engine="c", skiprows=0, na_filter=False, low_memory=False).as_matrix()
+    testing_file_content = pd.read_csv(testing_file_path, delimiter=",", engine="c", \
+                                       skiprows=0, na_filter=False, low_memory=False).as_matrix()
 
     # Generate prediction
     prediction = generate_prediction(classifier, testing_file_content, testing_image_feature_dict)
 
     # Write prediction to file
-    prediction_file_name = "prediction_" + selected_facial_image + "_" + selected_feature + "_" + str(int(time.time())) + ".csv"
+    prediction_file_name = "prediction_" + selected_facial_image + "_" + selected_feature + \
+                                                "_sklearn_" + str(int(time.time())) + ".csv"
     prediction_file_path = os.path.join(common.SUBMISSIONS_FOLDER_PATH, prediction_file_name)
     prediction_file_content = pd.DataFrame({"Id": testing_file_content[:, 0], "Prediction": prediction})
     prediction_file_content.to_csv(prediction_file_path, index=False, header=True)
