@@ -101,7 +101,7 @@ def get_record_map(index_array, true_false_ratio):
     record_index_pair_array = np.array(record_index_pair_list)
     record_index_pair_label_array = np.array(record_index_pair_label_list)
 
-    # Don't need sampling
+    # Do not need sampling
     if true_false_ratio is None:
         return (record_index_pair_array, record_index_pair_label_array)
 
@@ -175,16 +175,16 @@ def get_best_classifier(image_feature_list, image_index_list):
     print("Evaluating the performance of the classifiers ...")
 
     # Set the parameters for SVC
-    param_grid = [{'C': [1, 10, 100, 1000], 'gamma': ['auto'], 'kernel': ['linear']}, \
-                  {'C': [1, 10, 100, 1000], 'gamma': [0.001, 0.0001], 'kernel': ['rbf']}]
+    param_grid = [{"C": [1, 10, 100, 1000], "gamma": ["auto"], "kernel": ["linear"]}, \
+                  {"C": [1, 10, 100, 1000], "gamma": [0.001, 0.0001], "kernel": ["rbf"]}]
     parameters_combinations = ParameterGrid(param_grid)
 
     # Get a list of different classifiers
     classifier_list = []
     for current_parameters in parameters_combinations:
-        current_classifier = SVC(C=current_parameters['C'],
-                                 kernel=current_parameters['kernel'],
-                                 gamma=current_parameters['gamma'],
+        current_classifier = SVC(C=current_parameters["C"],
+                                 kernel=current_parameters["kernel"],
+                                 gamma=current_parameters["gamma"],
                                  probability=True)
         classifier_list.append(current_classifier)
 
@@ -219,7 +219,24 @@ def get_best_classifier(image_feature_list, image_index_list):
 
     return classifier_list[best_classifier_index]
 
-def generate_prediction(classifier, testing_file_content, testing_image_feature_dict):
+def write_prediction(testing_file_content, prediction, prediction_file_name):
+    """Write prediction file to disk.
+    
+    :param testing_file_content: the content in the testing file
+    :type testing_file_content: numpy array
+    :param prediction: the prediction
+    :type prediction: numpy array
+    :param prediction_file_name: the name of the prediciton file
+    :type prediction_file_name: string
+    :return: the prediction file will be saved to disk
+    :rtype: None
+    """
+
+    prediction_file_path = os.path.join(common.SUBMISSIONS_FOLDER_PATH, prediction_file_name)
+    prediction_file_content = pd.DataFrame({"Id": testing_file_content[:, 0], "Prediction": prediction})
+    prediction_file_content.to_csv(prediction_file_path, index=False, header=True)
+
+def generate_prediction(classifier, testing_file_content, testing_image_feature_dict, prediction_file_prefix):
     """Generate prediction.
     
     :param classifier: the classifier
@@ -228,8 +245,10 @@ def generate_prediction(classifier, testing_file_content, testing_image_feature_
     :type testing_file_content: numpy array
     :param testing_image_feature_dict: the features of the testing images which is saved in a dict
     :type testing_image_feature_dict: dict
-    :return: the prediction
-    :rtype: numpy array
+    :param prediction_file_prefix: the prefix of the prediction file
+    :type prediction_file_prefix: string
+    :return: the prediction file will be saved to disk
+    :rtype: None
     """
 
     print("Generating prediction ...")
@@ -255,7 +274,9 @@ def generate_prediction(classifier, testing_file_content, testing_image_feature_
     # Report tracking information
     print(progress_bar)
 
-    return np.array(prediction_list)
+    # Write prediction
+    prediction_file_name = prediction_file_prefix + str(int(time.time())) + ".csv"
+    write_prediction(testing_file_content, np.array(prediction_list), prediction_file_name)
 
 def make_prediction(facial_image_extension, feature_extension):
     """Make prediction.
@@ -290,20 +311,14 @@ def make_prediction(facial_image_extension, feature_extension):
                                        skiprows=0, na_filter=False, low_memory=False).as_matrix()
 
     # Generate prediction
-    prediction = generate_prediction(classifier, testing_file_content, testing_image_feature_dict)
-
-    # Write prediction to file
-    prediction_file_name = "prediction_" + selected_facial_image + "_" + selected_feature + \
-                                                "_sklearn_" + str(int(time.time())) + ".csv"
-    prediction_file_path = os.path.join(common.SUBMISSIONS_FOLDER_PATH, prediction_file_name)
-    prediction_file_content = pd.DataFrame({"Id": testing_file_content[:, 0], "Prediction": prediction})
-    prediction_file_content.to_csv(prediction_file_path, index=False, header=True)
+    prediction_file_prefix = "prediction_" + selected_facial_image + "_" + selected_feature + "_sklearn_"
+    generate_prediction(classifier, testing_file_content, testing_image_feature_dict, prediction_file_prefix)
 
 def run():
     # Crop out facial images and retrieve features. Ideally, one only need to call this function once.
     prepare_data.run()
 
-    # Generate prediction by using different features
+    # Make prediction by using different features
     for facial_image_extension, feature_extension in itertools.product(\
                 prepare_data.FACIAL_IMAGE_EXTENSION_LIST, prepare_data.FEATURE_EXTENSION_LIST):
         make_prediction(facial_image_extension, feature_extension)
