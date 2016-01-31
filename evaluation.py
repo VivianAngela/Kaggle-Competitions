@@ -143,19 +143,6 @@ def combine_submissions(submission_file_name_rule_list):
     :rtype: None
     """
 
-    def get_ranks(input_array):
-        """Get the ranks of the elements in an array.
-        
-        :param input_array: input array
-        :type input_array: numpy array
-        :return: the ranks of the elements
-        :rtype: numpy array
-        """
-
-        order = input_array.argsort()
-        ranks = order.argsort()
-        return ranks
-
     # Get the list of submission files based on the rules
     submission_file_path_list = []
     for submission_file_name_rule in submission_file_name_rule_list:
@@ -167,16 +154,15 @@ def combine_submissions(submission_file_name_rule_list):
                 submission_file_path_list.append(current_submission_file_path)
 
     # Read submission files
-    submission_ranks_list = []
+    submission_label_list = []
     for submission_file_path in submission_file_path_list:
         submission_file_content = pd.read_csv(submission_file_path, skiprows=0).as_matrix()
         submission_label = submission_file_content[:, 1]
-        submission_ranks = get_ranks(submission_label)
-        submission_ranks_list.append(submission_ranks)
-    submission_ranks_array = np.array(submission_ranks_list)
+        submission_label_list.append(submission_label)
+    submission_label_array = np.array(submission_label_list)
 
     # Generate mean submission file
-    mean_submission = np.mean(submission_ranks_array, axis=0)
+    mean_submission = np.mean(submission_label_array, axis=0)
     mean_submission_file_content = pd.DataFrame({\
                                                  "Id": np.arange(mean_submission.shape[0]), \
                                                  "Prediction": mean_submission})
@@ -185,7 +171,7 @@ def combine_submissions(submission_file_name_rule_list):
                                         index=False, header=True)
 
     # Generate median submission file
-    median_submission = np.median(submission_ranks_array, axis=0)
+    median_submission = np.median(submission_label_array, axis=0)
     median_submission_file_content = pd.DataFrame({\
                                                    "Id": np.arange(median_submission.shape[0]), \
                                                    "Prediction": median_submission})
