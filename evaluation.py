@@ -1,4 +1,4 @@
-from sklearn.metrics import auc, roc_curve
+from sklearn.metrics import auc, roc_curve, matthews_corrcoef
 import common
 import glob
 import numpy as np
@@ -6,6 +6,19 @@ import os
 import pandas as pd
 import pylab
 import time
+
+def compute_MCC(y_true, y_score):
+    """Compute the Matthews Correlation Coefficient.
+    
+    :param y_true: true binary labels in range {0, 1}
+    :type y_true: numpy array
+    :param y_score: the probability estimates of the positive class
+    :type y_score: numpy array
+    :return: the Matthews Correlation Coefficient
+    :rtype: float
+    """
+
+    return matthews_corrcoef(y_true, y_score > 0.5)
 
 def compute_Weighted_AUC(y_true, y_score, weight_distribution=np.arange(4, -1, -1.0)):
     """Compute the Weighted AUC score.
@@ -129,8 +142,9 @@ def perform_evaluation():
         submission_file_content = pd.read_csv(submission_file_path, skiprows=0).as_matrix()
         submission_label = submission_file_content[:, 1]
 
-        # Compute Weighted AUC of current submission file
-        score = compute_Weighted_AUC(groundtruth_label, submission_label)
+        # Compute Weighted AUC or MCC of current submission file
+        # score = compute_Weighted_AUC(groundtruth_label, submission_label)
+        score = compute_MCC(groundtruth_label, submission_label)
 
         print("{} achieved {:.4f}.".format(os.path.basename(submission_file_path), score))
 
@@ -182,4 +196,5 @@ def combine_submissions(submission_file_name_rule_list):
 if __name__ == "__main__":
     # combine_submissions(["prediction_open_face_open_face_keras*.csv"])
     # combine_submissions(["prediction_bbox_vgg_face_keras*.csv"])
+
     perform_evaluation()
