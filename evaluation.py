@@ -120,6 +120,7 @@ def perform_evaluation():
 
     # List all csv files in current folder and evaluate them
     submission_file_path_list = glob.glob(os.path.join(common.SUBMISSIONS_FOLDER_PATH, "*.csv"))
+    submission_file_path_list = sorted(submission_file_path_list)
     for submission_file_path in submission_file_path_list:
         if submission_file_path == groundtruth_file_path:
             continue
