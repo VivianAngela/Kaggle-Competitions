@@ -5,6 +5,7 @@ import numpy as np
 import os
 import pandas as pd
 import pylab
+import time
 
 def compute_Weighted_AUC(y_true, y_score, weight_distribution=np.arange(4, -1, -1.0)):
     """Compute the Weighted AUC score.
@@ -132,11 +133,11 @@ def perform_evaluation():
 
         print("{} achieved {:.4f}.".format(os.path.basename(submission_file_path), score))
 
-def combine_submissions(selected_submission_file_name_list):
+def combine_submissions(submission_file_name_rule_list):
     """Combine submissions.
     
-    :param selected_submission_file_name_list: the file names of the selected submission files
-    :type selected_submission_file_name_list: list
+    :param submission_file_name_rule_list: the file name rules of the submissions
+    :type submission_file_name_rule_list: list
     :return: the new submission file will be created
     :rtype: None
     """
@@ -154,34 +155,44 @@ def combine_submissions(selected_submission_file_name_list):
         ranks = order.argsort()
         return ranks
 
-    # Read selected submission files
-    selected_submission_ranks_list = []
-    for selected_submission_file_name in selected_submission_file_name_list:
-        selected_submission_file_path = os.path.join(common.SUBMISSIONS_FOLDER_PATH, selected_submission_file_name)
-        selected_submission_file_content = pd.read_csv(selected_submission_file_path, skiprows=0).as_matrix()
-        selected_submission_label = selected_submission_file_content[:, 1]
-        selected_submission_ranks = get_ranks(selected_submission_label)
-        selected_submission_ranks_list.append(selected_submission_ranks)
-    selected_submission_ranks_array = np.array(selected_submission_ranks_list)
+    # Get the list of submission files based on the rules
+    submission_file_path_list = []
+    for submission_file_name_rule in submission_file_name_rule_list:
+        current_submission_file_path_list = glob.glob(os.path.join(\
+                                                                   common.SUBMISSIONS_FOLDER_PATH, \
+                                                                   submission_file_name_rule))
+        for current_submission_file_path in current_submission_file_path_list:
+            if current_submission_file_path not in submission_file_path_list:
+                submission_file_path_list.append(current_submission_file_path)
+
+    # Read submission files
+    submission_ranks_list = []
+    for submission_file_path in submission_file_path_list:
+        submission_file_content = pd.read_csv(submission_file_path, skiprows=0).as_matrix()
+        submission_label = submission_file_content[:, 1]
+        submission_ranks = get_ranks(submission_label)
+        submission_ranks_list.append(submission_ranks)
+    submission_ranks_array = np.array(submission_ranks_list)
 
     # Generate mean submission file
-    mean_submission = np.mean(selected_submission_ranks_array, axis=0)
+    mean_submission = np.mean(submission_ranks_array, axis=0)
     mean_submission_file_content = pd.DataFrame({\
                                                  "Id": np.arange(mean_submission.shape[0]), \
                                                  "Prediction": mean_submission})
-    mean_submission_file_content.to_csv(\
-                                        os.path.join(common.SUBMISSIONS_FOLDER_PATH, "mean_submission.csv"), \
+    mean_submission_file_content.to_csv(os.path.join(\
+                                        common.SUBMISSIONS_FOLDER_PATH, "mean_submission_" + str(int(time.time())) + ".csv"), \
                                         index=False, header=True)
 
     # Generate median submission file
-    median_submission = np.median(selected_submission_ranks_array, axis=0)
+    median_submission = np.median(submission_ranks_array, axis=0)
     median_submission_file_content = pd.DataFrame({\
                                                    "Id": np.arange(median_submission.shape[0]), \
                                                    "Prediction": median_submission})
-    median_submission_file_content.to_csv(\
-                                          os.path.join(common.SUBMISSIONS_FOLDER_PATH, "median_submission.csv"), \
-                                          index=False, header=True)
+    median_submission_file_content.to_csv(os.path.join(\
+                                        common.SUBMISSIONS_FOLDER_PATH, "median_submission_" + str(int(time.time())) + ".csv"), \
+                                        index=False, header=True)
 
 if __name__ == "__main__":
-    # combine_submissions(["01_nobody.csv", "02_chenriwei.csv"])
+    # combine_submissions(["prediction_open_face_open_face_keras*.csv"])
+    # combine_submissions(["prediction_bbox_vgg_face_keras*.csv"])
     perform_evaluation()
