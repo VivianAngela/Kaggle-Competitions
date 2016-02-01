@@ -244,16 +244,17 @@ def generate_prediction(description, testing_file_content, testing_image_feature
     :rtype: None
     """
 
-    print("Generating prediction ...")
+    print("\nGenerating prediction ...")
 
     working_directory = keras_related.get_working_directory(description)
     model_path_rule = os.path.join(working_directory, "*" + common.KERAS_MODEL_EXTENSION)
-    for model_path in glob.glob(model_path_rule):
+    for model_path in sorted(glob.glob(model_path_rule)):
         model_name = os.path.basename(os.path.splitext(model_path)[0])
         print("\nWorking on {} ...".format(model_name))
 
         # Init a keras model with specific weights
-        dimension = testing_image_feature_dict.values()[0].size
+        final_feature = get_final_feature(testing_image_feature_dict.values()[0], testing_image_feature_dict.values()[0])
+        dimension = final_feature.size
         model = keras_related.init_model(dimension)
         model.load_weights(model_path)
 

@@ -53,17 +53,17 @@ def init_model(dimension, unique_label_num=2):
 
     model = Sequential()
 
-    model.add(Dense(128, input_shape=(dimension,)))
+    model.add(Dense(32, input_shape=(dimension,)))
     model.add(PReLU())
     model.add(BatchNormalization())
     model.add(Dropout(0.5))
 
-    model.add(Dense(128))
+    model.add(Dense(32))
     model.add(PReLU())
     model.add(BatchNormalization())
     model.add(Dropout(0.5))
 
-    model.add(Dense(128))
+    model.add(Dense(32))
     model.add(PReLU())
     model.add(BatchNormalization())
     model.add(Dropout(0.5))
@@ -79,7 +79,7 @@ class Customized_Callback(Callback):
     The model file will be updated only if the new coefficients achieve higher score.
     """
 
-    def __init__(self, model_path, X_test, Y_test, monitor="Weighted AUC"):
+    def __init__(self, model_path, X_test, Y_test, monitor="score"):
         """Init function.
         
         :param model_path: the path of the model file
@@ -119,7 +119,7 @@ class Customized_Callback(Callback):
         prediction = probability_estimates[:, 1]
         score = evaluation.compute_Weighted_AUC(self.Y_test, prediction)
 
-        if score >= self.best_score * (1 + 0.0005):
+        if self.best_score < 0 or score > self.best_score:
             print("In epoch {:05d}: {} improved from {:.4f} to {:.4f}, saving model to {}.".format(epoch + 1, self.monitor, self.best_score, score, os.path.basename(model_path)))
             self.best_score_index = epoch + 1
             self.best_score = score

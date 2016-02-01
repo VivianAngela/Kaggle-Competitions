@@ -251,7 +251,7 @@ def generate_prediction(classifier, testing_file_content, testing_image_feature_
     :rtype: None
     """
 
-    print("Generating prediction ...")
+    print("\nGenerating prediction ...")
 
     # Add progress bar
     progress_bar = pyprind.ProgBar(testing_file_content.shape[0], monitor=True)
