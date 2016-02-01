@@ -192,6 +192,10 @@ def get_best_classifier(image_feature_list, image_index_list):
     fold_num = 5
     score_record = np.zeros((len(classifier_list), fold_num))
     label_kfold = LabelKFold(image_index_list, n_folds=fold_num)
+
+    # Add progress bar
+    progress_bar = pyprind.ProgBar(fold_num, monitor=True)
+
     for fold_index, fold_item in enumerate(label_kfold):
         print("\nWorking on the {:d}/{:d} fold ...".format(fold_index + 1, fold_num))
 
@@ -208,6 +212,12 @@ def get_best_classifier(image_feature_list, image_index_list):
             score_record[classifier_index, fold_index] = score
 
             print("Classifier {:d} achieved {:.4f}.".format(classifier_index, score))
+
+        # Update progress bar
+        progress_bar.update()
+
+    # Report tracking information
+    print(progress_bar)
 
     # Print the info of the best classifier
     arithmetic_mean = np.mean(score_record, axis=1)
