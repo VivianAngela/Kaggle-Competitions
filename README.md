@@ -6,3 +6,4 @@ This repository contains Python implementation for the Kaggle competition "TUGra
 
 #### Notes
 * This repository is under active development. Additional code will be uploaded when ready.
+* The code in the subfolder **Extra** might be a little bit messy. Most of them are used to generate figures for the thesis.
