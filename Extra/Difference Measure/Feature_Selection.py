@@ -1,12 +1,7 @@
 from joblib import Parallel, delayed
-from mpl_toolkits.mplot3d import Axes3D
-from sklearn.cross_validation import LabelKFold
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.grid_search import ParameterGrid
 from sklearn.metrics.pairwise import pairwise_distances
-from sklearn.svm import SVC
 import common
-import evaluation
 import itertools
 import numpy as np
 import os
@@ -274,7 +269,7 @@ def make_prediction(facial_image_extension, feature_extension):
     print("Making prediction by using facial image \"{}\" with feature \"{}\" ...".format(selected_facial_image, selected_feature))
 
     # Load feature
-    training_image_feature_list, training_image_index_list, testing_image_feature_dict = \
+    training_image_feature_list, training_image_index_list, _ = \
         load_feature(facial_image_extension, feature_extension)
 
     image_feature_list = training_image_feature_list
@@ -326,7 +321,7 @@ def illustrate(facial_image_extension, feature_extension):
     print("Making prediction by using facial image \"{}\" with feature \"{}\" ...".format(selected_facial_image, selected_feature))
 
     # Load feature
-    training_image_feature_list, training_image_index_list, testing_image_feature_dict = \
+    training_image_feature_list, training_image_index_list, _ = \
         load_feature(facial_image_extension, feature_extension)
 
     # Generate training data
