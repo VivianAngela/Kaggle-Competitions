@@ -7,6 +7,19 @@ import pandas as pd
 import pylab
 import time
 
+def get_ranks(input_array):
+    """Get the ranks of the elements in an array.
+    
+    :param input_array: input array
+    :type input_array: numpy array
+    :return: the ranks of the elements
+    :rtype: numpy array
+    """
+
+    order = input_array.argsort()
+    ranks = order.argsort()
+    return ranks
+
 def compute_MCC(y_true, y_score):
     """Compute the Matthews Correlation Coefficient.
     
