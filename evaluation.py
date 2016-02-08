@@ -20,18 +20,37 @@ def get_ranks(input_array):
     ranks = order.argsort()
     return ranks
 
-def compute_MCC(y_true, y_score):
+def compute_MCC(y_true, y_score, threshold_num=100):
     """Compute the Matthews Correlation Coefficient.
     
     :param y_true: true binary labels in range {0, 1}
     :type y_true: numpy array
     :param y_score: the probability estimates of the positive class
     :type y_score: numpy array
-    :return: the Matthews Correlation Coefficient
+    :param threshold_num: the number of thresholds
+    :type threshold_num: int
+    :return: the maximum Matthews Correlation Coefficient
     :rtype: float
     """
 
-    return matthews_corrcoef(y_true, y_score > 0.5)
+    # Get the ranks
+    ranks = get_ranks(y_score)
+
+    # Generate the array which contains the value of thresholds
+    threshold_array = np.linspace(np.min(ranks) - 1, np.max(ranks) + 1, num=threshold_num)
+
+    # Generate MCC values
+    MCC_list = []
+    for threshold in threshold_array:
+        MCC_list.append(matthews_corrcoef(y_true, ranks > threshold))
+    MCC_array = np.array(MCC_list)
+
+    # Illustrate threshold and MCC values
+    pylab.figure()
+    pylab.plot(threshold_array / np.max(ranks), MCC_array)
+    pylab.show()
+
+    return np.max(MCC_array)
 
 def perform_interpolation(x_array, y_array, threshold_array):
     """Perform interpolation on the ROC curve.
