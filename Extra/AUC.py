@@ -8,8 +8,8 @@ def conventional_AUC():
         y[index] = -(single_x - 1) ** 2 + 1
 
     pylab.figure()
-    pylab.plot(x, y, "b", label="Curve A")
-    pylab.plot(1 - y, 1 - x, "r", label="Curve B")
+    pylab.plot(x, y, "yellowgreen", label="Curve A")
+    pylab.plot(1 - y, 1 - x, "lightskyblue", label="Curve B")
     pylab.legend(loc="lower right")
     pylab.xlabel("False Positive Rate")
     pylab.ylabel("True Positive Rate")
