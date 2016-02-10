@@ -2,6 +2,7 @@ from joblib import Parallel, delayed
 from sklearn.cross_validation import KFold
 import numpy as np
 import prepare_data
+import pylab
 import solution_basic
 
 # Get image paths in the training and testing datasets
@@ -56,8 +57,8 @@ def inspect_final_data_set_with_labels(image_index_list, seed):
 
 repeated_num = 20
 seed_array = np.random.choice(range(repeated_num), size=repeated_num, replace=False)
-# records_list = (Parallel(n_jobs=-1)(delayed(inspect_final_data_set_without_labels)(training_image_index_list, seed) for seed in seed_array))
-records_list = (Parallel(n_jobs=-1)(delayed(inspect_final_data_set_with_labels)(training_image_index_list, seed) for seed in seed_array))
+records_list = (Parallel(n_jobs=-1)(delayed(inspect_final_data_set_without_labels)(training_image_index_list, seed) for seed in seed_array))
+# records_list = (Parallel(n_jobs=-1)(delayed(inspect_final_data_set_with_labels)(training_image_index_list, seed) for seed in seed_array))
 
 true_records_num_list = []
 false_records_num_list = []
@@ -70,4 +71,25 @@ for single_true_records_num_list, single_false_records_num_list in records_list:
         false_records_num_list.append(value)
 
 for single_list in [true_records_num_list, false_records_num_list]:
-    print("The min is {:d}. The max is {:d}. The mean is {:.4f}".format(np.min(single_list), np.max(single_list), np.mean(single_list)))
+    repeated_times_list = []
+    min_value_list = []
+    max_value_list = []
+    mean_value_list = []
+
+    for end_index in range(len(single_list)):
+        current_list = single_list[0:end_index + 1]
+
+        repeated_times_list.append(len(current_list))
+        min_value_list.append(np.min(current_list))
+        max_value_list.append(np.max(current_list))
+        mean_value_list.append(np.mean(current_list))
+
+    pylab.figure()
+    pylab.plot(repeated_times_list, min_value_list, color="yellowgreen", label="Minimum Value")
+    pylab.plot(repeated_times_list, max_value_list, color="lightskyblue", label="Maximum Value")
+    pylab.plot(repeated_times_list, mean_value_list, color="darkorange", label="Mean Value")
+    pylab.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3, ncol=3, mode="expand", borderaxespad=0.)
+    pylab.xlabel("Repeated Times")
+    pylab.ylabel("Number of Occurrences")
+    pylab.grid()
+    pylab.show()
