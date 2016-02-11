@@ -55,10 +55,13 @@ def inspect_final_data_set_with_labels(image_index_list, seed):
 
     return ([true_records_num], [false_records_num])
 
-repeated_num = 20
+# repeated_num = 20
+# seed_array = np.random.choice(range(repeated_num), size=repeated_num, replace=False)
+# records_list = (Parallel(n_jobs=-1)(delayed(inspect_final_data_set_without_labels)(training_image_index_list, seed) for seed in seed_array))
+
+repeated_num = 100
 seed_array = np.random.choice(range(repeated_num), size=repeated_num, replace=False)
-records_list = (Parallel(n_jobs=-1)(delayed(inspect_final_data_set_without_labels)(training_image_index_list, seed) for seed in seed_array))
-# records_list = (Parallel(n_jobs=-1)(delayed(inspect_final_data_set_with_labels)(training_image_index_list, seed) for seed in seed_array))
+records_list = (Parallel(n_jobs=-1)(delayed(inspect_final_data_set_with_labels)(training_image_index_list, seed) for seed in seed_array))
 
 true_records_num_list = []
 false_records_num_list = []
