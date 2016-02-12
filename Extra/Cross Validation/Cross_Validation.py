@@ -55,13 +55,13 @@ def inspect_final_data_set_with_labels(image_index_list, seed):
 
     return ([true_records_num], [false_records_num])
 
-# repeated_num = 20
-# seed_array = np.random.choice(range(repeated_num), size=repeated_num, replace=False)
-# records_list = (Parallel(n_jobs=-1)(delayed(inspect_final_data_set_without_labels)(training_image_index_list, seed) for seed in seed_array))
-
-repeated_num = 100
+repeated_num = 20
 seed_array = np.random.choice(range(repeated_num), size=repeated_num, replace=False)
-records_list = (Parallel(n_jobs=-1)(delayed(inspect_final_data_set_with_labels)(training_image_index_list, seed) for seed in seed_array))
+records_list = (Parallel(n_jobs=-1)(delayed(inspect_final_data_set_without_labels)(training_image_index_list, seed) for seed in seed_array))
+
+# repeated_num = 100
+# seed_array = np.random.choice(range(repeated_num), size=repeated_num, replace=False)
+# records_list = (Parallel(n_jobs=-1)(delayed(inspect_final_data_set_with_labels)(training_image_index_list, seed) for seed in seed_array))
 
 true_records_num_list = []
 false_records_num_list = []
@@ -88,11 +88,11 @@ for single_list in [true_records_num_list, false_records_num_list]:
         mean_value_list.append(np.mean(current_list))
 
     pylab.figure()
-    pylab.plot(repeated_times_list, min_value_list, color="yellowgreen", label="Minimum Value")
-    pylab.plot(repeated_times_list, max_value_list, color="lightskyblue", label="Maximum Value")
-    pylab.plot(repeated_times_list, mean_value_list, color="darkorange", label="Mean Value")
+    pylab.plot(repeated_times_list, min_value_list, color="yellowgreen", label="Minimum")
+    pylab.plot(repeated_times_list, max_value_list, color="lightskyblue", label="Maximum")
+    pylab.plot(repeated_times_list, mean_value_list, color="darkorange", label="Mean")
     pylab.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3, ncol=3, mode="expand", borderaxespad=0.)
-    pylab.xlabel("Repeated Times")
-    pylab.ylabel("Number of Occurrences")
+    pylab.xlabel("Repeated Times", fontsize="large")
+    pylab.ylabel("Number of Occurrences", fontsize="large")
     pylab.grid()
     pylab.show()
