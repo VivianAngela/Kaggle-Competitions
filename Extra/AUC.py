@@ -11,8 +11,8 @@ def conventional_AUC():
     pylab.plot(x, y, "yellowgreen", label="Curve A")
     pylab.plot(1 - y, 1 - x, "lightskyblue", label="Curve B")
     pylab.legend(loc="lower right")
-    pylab.xlabel("False Positive Rate")
-    pylab.ylabel("True Positive Rate")
+    pylab.xlabel("False Positive Rate", fontsize="large")
+    pylab.ylabel("True Positive Rate", fontsize="large")
     pylab.title("ROC Curve")
     pylab.show()
 
