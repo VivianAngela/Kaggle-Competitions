@@ -5,9 +5,6 @@ import prepare_data
 import pylab
 import solution_basic
 
-# Get image paths in the training and testing datasets
-image_paths_in_training_dataset, training_image_index_list = prepare_data.get_image_paths_in_training_dataset()
-
 def inspect_final_data_set_without_labels(image_index_list, seed):
     np.random.seed(seed)
     image_index_array = np.array(image_index_list)
@@ -39,7 +36,9 @@ def inspect_final_data_set_with_labels(image_index_list, seed):
     # Cross Validation
     fold_num = 5
     unique_label_values = np.unique(image_index_list)
-    selected_label_values = np.random.choice(unique_label_values, size=np.ceil(unique_label_values.size * (fold_num - 1) / fold_num), replace=False)
+    selected_label_values = np.random.choice(unique_label_values, \
+                                             size=np.ceil(unique_label_values.size * (fold_num - 1) / fold_num), \
+                                             replace=False)
 
     selected_index_list = []
     for single_image_index in image_index_list:
@@ -55,44 +54,50 @@ def inspect_final_data_set_with_labels(image_index_list, seed):
 
     return ([true_records_num], [false_records_num])
 
-repeated_num = 20
-seed_array = np.random.choice(range(repeated_num), size=repeated_num, replace=False)
-records_list = (Parallel(n_jobs=-1)(delayed(inspect_final_data_set_without_labels)(training_image_index_list, seed) for seed in seed_array))
+def inspect_number_of_occurrences():
+    # Get image paths in the training and testing datasets
+    _, training_image_index_list = prepare_data.get_image_paths_in_training_dataset()
 
-# repeated_num = 100
-# seed_array = np.random.choice(range(repeated_num), size=repeated_num, replace=False)
-# records_list = (Parallel(n_jobs=-1)(delayed(inspect_final_data_set_with_labels)(training_image_index_list, seed) for seed in seed_array))
+    repeated_num = 20
+    seed_array = np.random.choice(range(repeated_num), size=repeated_num, replace=False)
+    records_list = (Parallel(n_jobs=-1)(delayed(inspect_final_data_set_without_labels)(training_image_index_list, seed) for seed in seed_array))
 
-true_records_num_list = []
-false_records_num_list = []
+    # repeated_num = 100
+    # seed_array = np.random.choice(range(repeated_num), size=repeated_num, replace=False)
+    # records_list = (Parallel(n_jobs=-1)(delayed(inspect_final_data_set_with_labels)(training_image_index_list, seed) for seed in seed_array))
 
-for single_true_records_num_list, single_false_records_num_list in records_list:
-    for value in single_true_records_num_list:
-        true_records_num_list.append(value)
+    true_records_num_list = []
+    false_records_num_list = []
 
-    for value in single_false_records_num_list:
-        false_records_num_list.append(value)
+    for single_true_records_num_list, single_false_records_num_list in records_list:
+        for value in single_true_records_num_list:
+            true_records_num_list.append(value)
 
-for single_list in [true_records_num_list, false_records_num_list]:
-    repeated_times_list = []
-    min_value_list = []
-    max_value_list = []
-    mean_value_list = []
+        for value in single_false_records_num_list:
+            false_records_num_list.append(value)
 
-    for end_index in range(len(single_list)):
-        current_list = single_list[0:end_index + 1]
+    for single_list in [true_records_num_list, false_records_num_list]:
+        repeated_times_list = []
+        min_value_list = []
+        max_value_list = []
+        mean_value_list = []
 
-        repeated_times_list.append(len(current_list))
-        min_value_list.append(np.min(current_list))
-        max_value_list.append(np.max(current_list))
-        mean_value_list.append(np.mean(current_list))
+        for end_index in range(len(single_list)):
+            current_list = single_list[0:end_index + 1]
 
-    pylab.figure()
-    pylab.plot(repeated_times_list, min_value_list, color="yellowgreen", label="Minimum")
-    pylab.plot(repeated_times_list, max_value_list, color="lightskyblue", label="Maximum")
-    pylab.plot(repeated_times_list, mean_value_list, color="darkorange", label="Mean")
-    pylab.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3, ncol=3, mode="expand", borderaxespad=0.)
-    pylab.xlabel("Repeated Times", fontsize="large")
-    pylab.ylabel("Number of Occurrences", fontsize="large")
-    pylab.grid()
-    pylab.show()
+            repeated_times_list.append(len(current_list))
+            min_value_list.append(np.min(current_list))
+            max_value_list.append(np.max(current_list))
+            mean_value_list.append(np.mean(current_list))
+
+        pylab.figure()
+        pylab.plot(repeated_times_list, min_value_list, color="yellowgreen", label="Minimum")
+        pylab.plot(repeated_times_list, max_value_list, color="lightskyblue", label="Maximum")
+        pylab.plot(repeated_times_list, mean_value_list, color="darkorange", label="Mean")
+        pylab.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3, ncol=3, mode="expand", borderaxespad=0.)
+        pylab.xlabel("Repeated Times", fontsize="large")
+        pylab.ylabel("Number of Occurrences", fontsize="large")
+        pylab.grid()
+        pylab.show()
+
+inspect_number_of_occurrences()
