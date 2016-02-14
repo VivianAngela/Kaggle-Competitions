@@ -100,4 +100,23 @@ def inspect_number_of_occurrences():
         pylab.grid()
         pylab.show()
 
+def inspect_number_of_images():
+    # Get image paths in the training and testing datasets
+    _, training_image_index_list = prepare_data.get_image_paths_in_training_dataset()
+
+    images_number_list = []
+    for current_image_index in np.unique(training_image_index_list):
+        images_number_list.append(np.sum(np.array(training_image_index_list) == current_image_index))
+
+    # the histogram of the data with histtype="step"
+    bins = np.arange(np.min(images_number_list), np.max(images_number_list) + 2) - 0.5
+    _, _, patches = pylab.hist(images_number_list, bins=bins)
+    pylab.setp(patches, "facecolor", "yellowgreen", "alpha", 0.75)
+    pylab.xlim([bins[0], bins[-1]])
+    pylab.xticks(np.arange(np.min(images_number_list), np.max(images_number_list) + 1))
+    pylab.xlabel("Number of Images from the Same Person", fontsize="large")
+    pylab.ylabel("Number of Occurrences", fontsize="large")
+    pylab.title("Histogram of Number of Images from the Same Person")
+    pylab.show()
+
 inspect_number_of_occurrences()
