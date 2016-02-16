@@ -24,6 +24,9 @@ MODEL_DEFINITION_FILE_NAME = "VGG_FACE_deploy.prototxt"
 TRAINED_MODEL_FILE_NAME = "VGG_FACE.caffemodel"
 VGG_FACE_IMAGE_SIZE = 224
 
+# Variables related to congealingcomplex
+CONGEALINGCOMPLEX_PATH = "/opt/congealingcomplex"
+
 # Variables related to Keras models
 KERAS_MODEL_FOLDER_NAME = "keras_models"
 KERAS_MODEL_EXTENSION = ".hdf5"
