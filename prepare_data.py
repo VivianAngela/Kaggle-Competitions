@@ -1,4 +1,5 @@
 import common
+import congealingcomplex
 import cv2
 import glob
 import landmark
@@ -9,7 +10,7 @@ import pyprind
 import vgg_face
 
 # The extensions of the facial images
-FACIAL_IMAGE_EXTENSION_LIST = ["_bbox.jpg", "_open_face.jpg"]
+FACIAL_IMAGE_EXTENSION_LIST = ["_bbox.jpg", "_open_face.jpg", "_congealingcomplex.jpg"]
 
 # The file names of the mean facial images
 MEAN_IMAGE_NAME_LIST = ["mean" + value for value in FACIAL_IMAGE_EXTENSION_LIST]
@@ -17,7 +18,8 @@ MEAN_IMAGE_NAME_LIST = ["mean" + value for value in FACIAL_IMAGE_EXTENSION_LIST]
 # The function objects that could crop faces
 RETRIEVE_FACIAL_IMAGE_FUNC_LIST = [\
                                    getattr(landmark, "retrieve_facial_image_by_bbox"), \
-                                   getattr(open_face, "retrieve_facial_image_by_open_face")]
+                                   getattr(open_face, "retrieve_facial_image_by_open_face"), \
+                                   getattr(congealingcomplex, "retrieve_facial_image_by_congealingcomplex")]
 
 # The extensions of the feature files
 FEATURE_EXTENSION_LIST = ["_open_face.csv", "_vgg_face.csv"]
