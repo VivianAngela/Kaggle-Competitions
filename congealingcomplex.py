@@ -1,6 +1,7 @@
 from landmark import retrieve_facial_image_by_bbox
 import common
 import cv2
+import numpy as np
 import os
 import subprocess
 
@@ -39,7 +40,18 @@ def retrieve_facial_image_by_congealingcomplex(full_image_path, force_continue=T
                          input_image_info_path, \
                          os.path.join(common.CONGEALINGCOMPLEX_PATH, "people.train"), \
                          output_image_info_path])
-        return cv2.imread(output_image_path)
+
+        # Read the processed facial image
+        processed_facial_image = cv2.imread(output_image_path)
+
+        # Omit the totally black rows and columns
+        gray_processed_facial_image = cv2.cvtColor(processed_facial_image, cv2.COLOR_BGR2GRAY)
+        cumsum_in_row = np.cumsum(gray_processed_facial_image, axis=1)
+        valid_row_indexes = cumsum_in_row[:, -1] > 0
+        cumsum_in_column = np.cumsum(gray_processed_facial_image, axis=0)
+        valid_column_indexes = cumsum_in_column[-1, :] > 0
+
+        return processed_facial_image[valid_row_indexes, :, :][:, valid_column_indexes, :]
 
     try:
         # Read the coordinates of facial image from the bbox file
@@ -50,9 +62,7 @@ def retrieve_facial_image_by_congealingcomplex(full_image_path, force_continue=T
         x_middle = x + 0.5 * h
         y_middle = y + 0.5 * w
 
-        # Use a square and make the bouding square a little bit larger
-        h = 0.5 * (h + w)
-        w = h
+        # Make the bouding square a little bit larger
         x_start = int(x_middle - 0.8 * h)
         x_end = int(x_middle + 0.8 * h)
         y_start = int(y_middle - 0.8 * w)
@@ -65,9 +75,6 @@ def retrieve_facial_image_by_congealingcomplex(full_image_path, force_continue=T
         # Call congealingcomplex and resize it
         facial_image = call_congealingcomplex(facial_image)
         facial_image = cv2.resize(facial_image, dsize=(common.FACIAL_IMAGE_SIZE, common.FACIAL_IMAGE_SIZE))
-
-        cv2.imshow("", facial_image)
-        cv2.waitKey(0)
 
         # Successful case
         assert facial_image is not None
