@@ -1,3 +1,4 @@
+from sklearn.metrics.pairwise import pairwise_distances
 import common
 import itertools
 import numpy as np
@@ -103,17 +104,20 @@ def get_record_map(index_array, true_false_ratio):
     pair_label_true_indexes = np.where(record_index_pair_label_array)[0]
     pair_label_false_indexes = np.where(~record_index_pair_label_array)[0]
     selected_pair_label_false_indexes = np.random.choice(pair_label_false_indexes, \
-                                                         1.0 * pair_label_true_indexes.size / true_false_ratio, replace=False)
+                                                         1.0 * pair_label_true_indexes.size / true_false_ratio, \
+                                                         replace=False)
     selected_pair_label_indexes = np.hstack((pair_label_true_indexes, selected_pair_label_false_indexes))
     return (record_index_pair_array[selected_pair_label_indexes, :], record_index_pair_label_array[selected_pair_label_indexes])
 
-def get_final_feature(feature_1, feature_2):
+def get_final_feature(feature_1, feature_2, metric_list):
     """Get the difference between two features.
     
     :param feature_1: the first feature
     :type feature_1: numpy array
     :param feature_2: the second feature
     :type feature_2: numpy array
+    :param metric_list: the metrics which will be used to compare two feature vectors
+    :type metric_list: list
     :return: the difference between two features
     :rtype: numpy array
     """
@@ -121,10 +125,17 @@ def get_final_feature(feature_1, feature_2):
     if feature_1 is None or feature_2 is None:
         return None
 
-    difference = feature_1 - feature_2
-    return np.abs(difference)
+    if metric_list is None:
+        return np.abs(feature_1 - feature_2)
 
-def convert_to_final_data_set(image_feature_list, image_index_list, selected_indexes, true_false_ratio):
+    final_feature_list = []
+    for metric in metric_list:
+        distance_matrix = pairwise_distances(np.vstack((feature_1, feature_2)), metric=metric)
+        final_feature_list.append(distance_matrix[0, 1])
+
+    return np.array(final_feature_list)
+
+def convert_to_final_data_set(image_feature_list, image_index_list, selected_indexes, true_false_ratio, metric_list):
     """Convert to final data set.
     
     :param image_feature_list: the features of the images
@@ -135,6 +146,8 @@ def convert_to_final_data_set(image_feature_list, image_index_list, selected_ind
     :type selected_indexes: numpy array
     :param true_false_ratio: the number of occurrences of true cases over the number of occurrences of false cases
     :type true_false_ratio: int or float
+    :param metric_list: the metrics which will be used to compare two feature vectors
+    :type metric_list: list
     :return: feature_array refers to the feature difference between two images, 
         while label_array refers to whether these two images represent the same person.
     :rtype: tuple
@@ -150,7 +163,10 @@ def convert_to_final_data_set(image_feature_list, image_index_list, selected_ind
     # Retrieve the final feature
     final_feature_list = []
     for single_pair in pair_array:
-        final_feature = get_final_feature(selected_feature_array[single_pair[0], :], selected_feature_array[single_pair[1], :])
+        final_feature = get_final_feature(\
+                                          selected_feature_array[single_pair[0], :], \
+                                          selected_feature_array[single_pair[1], :], \
+                                          metric_list)
         final_feature_list.append(final_feature)
 
     return (np.array(final_feature_list), pair_label_array)

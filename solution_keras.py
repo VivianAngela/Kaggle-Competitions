@@ -11,7 +11,13 @@ import pyprind
 import solution_basic
 import time
 
-def perform_training(image_feature_list, image_index_list, description, nb_epoch):
+METRIC_LIST_DICT = {
+    "_open_face.csv":["correlation", "l1", "euclidean", "braycurtis", "sqeuclidean", \
+                    "cosine", "minkowski", "l2", "canberra", "chebyshev"], \
+    "_vgg_face.csv":["cosine", "sokalsneath", "dice", "braycurtis", "kulsinski", \
+                    "correlation", "russellrao", "matching", "sokalmichener", "rogerstanimoto"]}
+
+def perform_training(image_feature_list, image_index_list, description, feature_extension, nb_epoch):
     """Perform training phase.
     
     :param image_feature_list: the features of the images
@@ -20,6 +26,8 @@ def perform_training(image_feature_list, image_index_list, description, nb_epoch
     :type image_index_list: list
     :param description: the folder name of the working directory
     :type description: string
+    :param feature_extension: the extension of the feature files
+    :type feature_extension: string
     :param nb_epoch: the maximum number of epochs
     :type nb_epoch: int
     :return: the model files will be saved to disk
@@ -40,12 +48,13 @@ def perform_training(image_feature_list, image_index_list, description, nb_epoch
     # Add progress bar
     progress_bar = pyprind.ProgBar(fold_num, monitor=True)
 
+    metric_list = METRIC_LIST_DICT[feature_extension]
     for fold_index, fold_item in enumerate(label_kfold):
         print("\nWorking on the {:d}/{:d} fold ...".format(fold_index + 1, fold_num))
 
         # Generate final data set
-        X_train, Y_train = solution_basic.convert_to_final_data_set(image_feature_list, image_index_list, fold_item[0], 1)
-        X_test, Y_test = solution_basic.convert_to_final_data_set(image_feature_list, image_index_list, fold_item[1], None)
+        X_train, Y_train = solution_basic.convert_to_final_data_set(image_feature_list, image_index_list, fold_item[0], 1, metric_list)
+        X_test, Y_test = solution_basic.convert_to_final_data_set(image_feature_list, image_index_list, fold_item[1], None, metric_list)
 
         # Perform training
         model_name = "Model_{:d}".format(fold_index + 1) + common.KERAS_MODEL_EXTENSION
@@ -63,7 +72,7 @@ def perform_training(image_feature_list, image_index_list, description, nb_epoch
 
     print("\nThe best score is {:.4f} and the highest epoch is {:d}.".format(np.max(best_score_array), np.max(best_score_index_array).astype(np.int)))
 
-def generate_prediction(description, testing_file_content, testing_image_feature_dict, prediction_file_prefix):
+def generate_prediction(description, testing_file_content, testing_image_feature_dict, prediction_file_prefix, feature_extension):
     """Generate prediction.
     
     :param description: the folder name of the working directory
@@ -74,6 +83,8 @@ def generate_prediction(description, testing_file_content, testing_image_feature
     :type testing_image_feature_dict: dict
     :param prediction_file_prefix: the prefix of the prediction file
     :type prediction_file_prefix: string
+    :param feature_extension: the extension of the feature files
+    :type feature_extension: string
     :return: the prediction file will be saved to disk
     :rtype: None
     """
@@ -82,12 +93,13 @@ def generate_prediction(description, testing_file_content, testing_image_feature
 
     working_directory = keras_related.get_working_directory(description)
     model_path_rule = os.path.join(working_directory, "*" + common.KERAS_MODEL_EXTENSION)
+    metric_list = METRIC_LIST_DICT[feature_extension]
     for model_path in sorted(glob.glob(model_path_rule)):
         model_name = os.path.basename(os.path.splitext(model_path)[0])
         print("\nWorking on {} ...".format(model_name))
 
         # Init a keras model with specific weights
-        final_feature = solution_basic.get_final_feature(testing_image_feature_dict.values()[0], testing_image_feature_dict.values()[0])
+        final_feature = solution_basic.get_final_feature(testing_image_feature_dict.values()[0], testing_image_feature_dict.values()[0], metric_list)
         dimension = final_feature.size
         model = keras_related.init_model(dimension)
         model.load_weights(model_path)
@@ -100,7 +112,7 @@ def generate_prediction(description, testing_file_content, testing_image_feature
         for _, file_1_name, file_2_name in testing_file_content:
             file_1_feature = testing_image_feature_dict[file_1_name]
             file_2_feature = testing_image_feature_dict[file_2_name]
-            final_feature = solution_basic.get_final_feature(file_1_feature, file_2_feature)
+            final_feature = solution_basic.get_final_feature(file_1_feature, file_2_feature, metric_list)
             final_feature = final_feature.reshape(1, -1)
 
             probability_estimates = model.predict_proba(final_feature, verbose=0)
@@ -140,7 +152,7 @@ def make_prediction(facial_image_extension, feature_extension, nb_epoch=100):
 
     # Perform training
     description = selected_facial_image + " with " + selected_feature
-    perform_training(training_image_feature_list, training_image_index_list, description, nb_epoch)
+    perform_training(training_image_feature_list, training_image_index_list, description, feature_extension, nb_epoch)
 
     # Load testing file
     testing_file_path = os.path.join(common.DATA_PATH, common.TESTING_FILE_NAME)
@@ -148,8 +160,8 @@ def make_prediction(facial_image_extension, feature_extension, nb_epoch=100):
                                        skiprows=0, na_filter=False, low_memory=False).as_matrix()
 
     # Generate prediction
-    prediction_file_prefix = "prediction_" + selected_facial_image + "_" + selected_feature + "_keras_"
-    generate_prediction(description, testing_file_content, testing_image_feature_dict, prediction_file_prefix)
+    prediction_file_prefix = "Aurora_" + selected_facial_image + "_" + selected_feature + "_keras_"
+    generate_prediction(description, testing_file_content, testing_image_feature_dict, prediction_file_prefix, feature_extension)
 
 def run():
     # Crop out facial images and retrieve features. Ideally, one only need to call this function once.
