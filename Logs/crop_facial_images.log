@@ -1,0 +1,84 @@
+Cropping facial images with facial_image_extension is _bbox.jpg.
+
+Working on the training data set ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:00:12
+Title: 
+  Started: 02/20/2016 11:07:53
+  Finished: 02/20/2016 11:08:05
+  Total time elapsed: 00:00:12
+  CPU %: 96.700000
+  Memory %: 2.493970
+Can't crop out faces from 0/1393 images.
+Mean image saved.
+
+Working on the testing data set ...
+0%                          100%
+[#################             ] | ETA: 00:00:06libpng warning: iCCP: known incorrect sRGB profile
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:00:14
+Title: 
+  Started: 02/20/2016 11:08:05
+  Finished: 02/20/2016 11:08:20
+  Total time elapsed: 00:00:14
+  CPU %: 97.200000
+  Memory %: 2.462574
+Can't crop out faces from 0/1343 images.
+
+Cropping facial images with facial_image_extension is _open_face.jpg.
+
+Working on the training data set ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:14:18
+Title: 
+  Started: 02/20/2016 11:08:20
+  Finished: 02/20/2016 11:22:38
+  Total time elapsed: 00:14:18
+  CPU %: 100.200000
+  Memory %: 8.494570
+Can't crop out faces from 86/1393 images.
+Mean image saved.
+
+Working on the testing data set ...
+0%                          100%
+[#################             ] | ETA: 00:07:34libpng warning: iCCP: known incorrect sRGB profile
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:18:28
+Title: 
+  Started: 02/20/2016 11:22:38
+  Finished: 02/20/2016 11:41:07
+  Total time elapsed: 00:18:28
+  CPU %: 100.100000
+  Memory %: 8.805385
+Can't crop out faces from 0/1343 images.
+
+Cropping facial images with facial_image_extension is _congealingcomplex.jpg.
+
+Working on the training data set ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:25:48
+Title: 
+  Started: 02/20/2016 11:41:08
+  Finished: 02/20/2016 12:06:57
+  Total time elapsed: 00:25:48
+  CPU %: 2.900000
+  Memory %: 8.806271
+Can't crop out faces from 0/1393 images.
+Mean image saved.
+
+Working on the testing data set ...
+0%                          100%
+[#################             ] | ETA: 00:12:16libpng warning: iCCP: known incorrect sRGB profile
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:28:08
+Title: 
+  Started: 02/20/2016 12:06:58
+  Finished: 02/20/2016 12:35:06
+  Total time elapsed: 00:28:08
+  CPU %: 3.100000
+  Memory %: 8.806271
+Can't crop out faces from 0/1343 images.
+

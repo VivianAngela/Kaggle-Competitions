@@ -1,0 +1,72 @@
+Computing features with facial_image_extension is _bbox.jpg and feature_extension is _open_face.csv.
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:00:40
+Title: 
+  Started: 02/20/2016 12:40:08
+  Finished: 02/20/2016 12:40:49
+  Total time elapsed: 00:00:40
+  CPU %: 28.400000
+  Memory %: 1.971942
+Can't retrieve feature from 0/2736 images.
+
+Computing features with facial_image_extension is _open_face.jpg and feature_extension is _open_face.csv.
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:00:39
+Title: 
+  Started: 02/20/2016 12:40:49
+  Finished: 02/20/2016 12:41:29
+  Total time elapsed: 00:00:39
+  CPU %: 28.500000
+  Memory %: 1.980997
+Can't retrieve feature from 86/2736 images.
+
+Computing features with facial_image_extension is _congealingcomplex.jpg and feature_extension is _open_face.csv.
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:00:39
+Title: 
+  Started: 02/20/2016 12:41:29
+  Finished: 02/20/2016 12:42:09
+  Total time elapsed: 00:00:39
+  CPU %: 28.600000
+  Memory %: 1.980997
+Can't retrieve feature from 0/2736 images.
+
+Computing features with facial_image_extension is _bbox.jpg and feature_extension is _vgg_face.csv.
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:11:06
+Title: 
+  Started: 02/20/2016 12:45:00
+  Finished: 02/20/2016 12:56:06
+  Total time elapsed: 00:11:06
+  CPU %: 175.600000
+  Memory %: 7.403206
+Can't retrieve feature from 0/2736 images.
+
+Computing features with facial_image_extension is _open_face.jpg and feature_extension is _vgg_face.csv.
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:10:45
+Title: 
+  Started: 02/20/2016 12:56:07
+  Finished: 02/20/2016 13:06:52
+  Total time elapsed: 00:10:45
+  CPU %: 180.500000
+  Memory %: 7.405535
+Can't retrieve feature from 86/2736 images.
+
+Computing features with facial_image_extension is _congealingcomplex.jpg and feature_extension is _vgg_face.csv.
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:11:04
+Title: 
+  Started: 02/20/2016 13:06:53
+  Finished: 02/20/2016 13:17:57
+  Total time elapsed: 00:11:04
+  CPU %: 180.700000
+  Memory %: 7.406454
+Can't retrieve feature from 0/2736 images.
+
