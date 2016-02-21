@@ -1,0 +1,99 @@
+Making prediction by using facial image "bbox" with feature "vgg_face" ...
+
+Loading feature ...
+Feature loaded successfully.
+
+Performing training phase ...
+Resetting working directory: bbox with vgg_face
+0%  100%
+[     ]
+Working on the 1/5 fold ...
+In epoch 00001: score improved from -inf to 0.9962, saving model to Model_1.hdf5.
+For the 1 fold, the Keras model achieved the score 0.9962 at the 1 epoch.
+[#    ] | ETA: 00:05:53
+Working on the 2/5 fold ...
+In epoch 00001: score improved from -inf to 0.9961, saving model to Model_2.hdf5.
+For the 2 fold, the Keras model achieved the score 0.9961 at the 1 epoch.
+[##   ] | ETA: 00:04:15
+Working on the 3/5 fold ...
+In epoch 00001: score improved from -inf to 0.9963, saving model to Model_3.hdf5.
+In epoch 00003: score improved from 0.9963 to 0.9964, saving model to Model_3.hdf5.
+For the 3 fold, the Keras model achieved the score 0.9964 at the 3 epoch.
+[###  ] | ETA: 00:02:47
+Working on the 4/5 fold ...
+In epoch 00001: score improved from -inf to 0.9963, saving model to Model_4.hdf5.
+In epoch 00002: score improved from 0.9963 to 0.9963, saving model to Model_4.hdf5.
+In epoch 00004: score improved from 0.9963 to 0.9963, saving model to Model_4.hdf5.
+For the 4 fold, the Keras model achieved the score 0.9963 at the 4 epoch.
+[#### ] | ETA: 00:01:23
+Working on the 5/5 fold ...
+In epoch 00001: score improved from -inf to 0.9964, saving model to Model_5.hdf5.
+For the 5 fold, the Keras model achieved the score 0.9964 at the 1 epoch.
+[#####] | ETA: 00:00:00
+Total time elapsed: 00:07:02
+Title: 
+  Started: 02/21/2016 13:47:28
+  Finished: 02/21/2016 13:54:31
+  Total time elapsed: 00:07:02
+  CPU %: 99.900000
+  Memory %: 4.829875
+
+The best score is 0.9964 and the highest epoch is 4.
+
+Generating prediction ...
+
+Working on Model_1 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:29:56
+Title: 
+  Started: 02/21/2016 13:54:50
+  Finished: 02/21/2016 14:24:47
+  Total time elapsed: 00:29:56
+  CPU %: 100.000000
+  Memory %: 5.271263
+
+Working on Model_2 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:29:59
+Title: 
+  Started: 02/21/2016 14:25:07
+  Finished: 02/21/2016 14:55:07
+  Total time elapsed: 00:29:59
+  CPU %: 100.000000
+  Memory %: 6.091705
+
+Working on Model_3 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:28:26
+Title: 
+  Started: 02/21/2016 14:55:26
+  Finished: 02/21/2016 15:23:53
+  Total time elapsed: 00:28:26
+  CPU %: 100.000000
+  Memory %: 6.146428
+
+Working on Model_4 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:30:29
+Title: 
+  Started: 02/21/2016 15:24:15
+  Finished: 02/21/2016 15:54:45
+  Total time elapsed: 00:30:29
+  CPU %: 100.000000
+  Memory %: 6.148396
+
+Working on Model_5 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:30:15
+Title: 
+  Started: 02/21/2016 15:55:06
+  Finished: 02/21/2016 16:25:21
+  Total time elapsed: 00:30:15
+  CPU %: 100.000000
+  Memory %: 6.286875
+
