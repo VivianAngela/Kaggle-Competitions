@@ -1,0 +1,103 @@
+Making prediction by using facial image "congealingcomplex" with feature "vgg_face" ...
+
+Loading feature ...
+Feature loaded successfully.
+
+Performing training phase ...
+Resetting working directory: congealingcomplex with vgg_face
+0%  100%
+[     ]
+Working on the 1/5 fold ...
+In epoch 00001: score improved from -inf to 0.9960, saving model to Model_1.hdf5.
+In epoch 00002: score improved from 0.9960 to 0.9960, saving model to Model_1.hdf5.
+In epoch 00004: score improved from 0.9960 to 0.9960, saving model to Model_1.hdf5.
+For the 1 fold, the Keras model achieved the score 0.9960 at the 4 epoch.
+[#    ] | ETA: 00:05:36
+Working on the 2/5 fold ...
+In epoch 00001: score improved from -inf to 0.9954, saving model to Model_2.hdf5.
+In epoch 00004: score improved from 0.9954 to 0.9954, saving model to Model_2.hdf5.
+For the 2 fold, the Keras model achieved the score 0.9954 at the 4 epoch.
+[##   ] | ETA: 00:04:21
+Working on the 3/5 fold ...
+In epoch 00001: score improved from -inf to 0.9961, saving model to Model_3.hdf5.
+In epoch 00002: score improved from 0.9961 to 0.9961, saving model to Model_3.hdf5.
+In epoch 00004: score improved from 0.9961 to 0.9962, saving model to Model_3.hdf5.
+For the 3 fold, the Keras model achieved the score 0.9962 at the 4 epoch.
+[###  ] | ETA: 00:02:53
+Working on the 4/5 fold ...
+In epoch 00001: score improved from -inf to 0.9962, saving model to Model_4.hdf5.
+For the 4 fold, the Keras model achieved the score 0.9962 at the 1 epoch.
+[#### ] | ETA: 00:01:27
+Working on the 5/5 fold ...
+In epoch 00001: score improved from -inf to 0.9955, saving model to Model_5.hdf5.
+In epoch 00002: score improved from 0.9955 to 0.9955, saving model to Model_5.hdf5.
+In epoch 00004: score improved from 0.9955 to 0.9956, saving model to Model_5.hdf5.
+For the 5 fold, the Keras model achieved the score 0.9956 at the 4 epoch.
+[#####] | ETA: 00:00:00
+Total time elapsed: 00:07:14
+Title: 
+  Started: 02/22/2016 09:42:19
+  Finished: 02/22/2016 09:49:34
+  Total time elapsed: 00:07:14
+  CPU %: 100.000000
+  Memory %: 4.827086
+
+The best score is 0.9962 and the highest epoch is 4.
+
+Generating prediction ...
+
+Working on Model_1 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:27:22
+Title: 
+  Started: 02/22/2016 09:49:52
+  Finished: 02/22/2016 10:17:14
+  Total time elapsed: 00:27:22
+  CPU %: 100.000000
+  Memory %: 5.284025
+
+Working on Model_2 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:26:56
+Title: 
+  Started: 02/22/2016 10:17:31
+  Finished: 02/22/2016 10:44:28
+  Total time elapsed: 00:26:56
+  CPU %: 100.000000
+  Memory %: 6.085078
+
+Working on Model_3 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:26:45
+Title: 
+  Started: 02/22/2016 10:44:47
+  Finished: 02/22/2016 11:11:32
+  Total time elapsed: 00:26:45
+  CPU %: 100.000000
+  Memory %: 6.149446
+
+Working on Model_4 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:24:42
+Title: 
+  Started: 02/22/2016 11:11:50
+  Finished: 02/22/2016 11:36:33
+  Total time elapsed: 00:24:42
+  CPU %: 100.000000
+  Memory %: 6.153284
+
+Working on Model_5 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:24:59
+Title: 
+  Started: 02/22/2016 11:36:50
+  Finished: 02/22/2016 12:01:49
+  Total time elapsed: 00:24:59
+  CPU %: 100.000000
+  Memory %: 6.293666
+
