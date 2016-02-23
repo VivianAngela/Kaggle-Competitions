@@ -1,0 +1,98 @@
+Making prediction by using facial image "open_face" with feature "open_face" ...
+
+Loading feature ...
+Feature loaded successfully.
+
+Performing training phase ...
+Resetting working directory: open_face with open_face
+0%  100%
+[     ]
+Working on the 1/5 fold ...
+In epoch 00001: score improved from -inf to 0.9869, saving model to Model_1.hdf5.
+For the 1 fold, the Keras model achieved the score 0.9869 at the 1 epoch.
+[#    ] | ETA: 00:04:35
+Working on the 2/5 fold ...
+In epoch 00001: score improved from -inf to 0.9867, saving model to Model_2.hdf5.
+For the 2 fold, the Keras model achieved the score 0.9867 at the 1 epoch.
+[##   ] | ETA: 00:03:26
+Working on the 3/5 fold ...
+In epoch 00001: score improved from -inf to 0.9891, saving model to Model_3.hdf5.
+In epoch 00004: score improved from 0.9891 to 0.9891, saving model to Model_3.hdf5.
+In epoch 00005: score improved from 0.9891 to 0.9891, saving model to Model_3.hdf5.
+For the 3 fold, the Keras model achieved the score 0.9891 at the 5 epoch.
+[###  ] | ETA: 00:02:17
+Working on the 4/5 fold ...
+In epoch 00001: score improved from -inf to 0.9861, saving model to Model_4.hdf5.
+For the 4 fold, the Keras model achieved the score 0.9861 at the 1 epoch.
+[#### ] | ETA: 00:01:07
+Working on the 5/5 fold ...
+In epoch 00001: score improved from -inf to 0.9914, saving model to Model_5.hdf5.
+For the 5 fold, the Keras model achieved the score 0.9914 at the 1 epoch.
+[#####] | ETA: 00:00:00
+Total time elapsed: 00:05:40
+Title: 
+  Started: 02/22/2016 12:23:06
+  Finished: 02/22/2016 12:28:46
+  Total time elapsed: 00:05:40
+  CPU %: 99.900000
+  Memory %: 4.023015
+
+The best score is 0.9914 and the highest epoch is 5.
+
+Generating prediction ...
+
+Working on Model_1 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:20:15
+Title: 
+  Started: 02/22/2016 12:29:06
+  Finished: 02/22/2016 12:49:22
+  Total time elapsed: 00:20:15
+  CPU %: 100.000000
+  Memory %: 4.545010
+
+Working on Model_2 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:20:26
+Title: 
+  Started: 02/22/2016 12:49:40
+  Finished: 02/22/2016 13:10:07
+  Total time elapsed: 00:20:26
+  CPU %: 100.000000
+  Memory %: 5.388089
+
+Working on Model_3 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:21:18
+Title: 
+  Started: 02/22/2016 13:10:26
+  Finished: 02/22/2016 13:31:44
+  Total time elapsed: 00:21:18
+  CPU %: 100.000000
+  Memory %: 5.551535
+
+Working on Model_4 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:20:58
+Title: 
+  Started: 02/22/2016 13:32:04
+  Finished: 02/22/2016 13:53:02
+  Total time elapsed: 00:20:58
+  CPU %: 100.000000
+  Memory %: 5.514561
+
+Working on Model_5 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:21:12
+Title: 
+  Started: 02/22/2016 13:53:23
+  Finished: 02/22/2016 14:14:36
+  Total time elapsed: 00:21:12
+  CPU %: 100.000000
+  Memory %: 5.508459
+
