@@ -1,0 +1,109 @@
+Making prediction by using facial image "bbox" with feature "open_face" ...
+
+Loading feature ...
+Feature loaded successfully.
+
+Performing training phase ...
+Resetting working directory: bbox with open_face
+0%  100%
+[     ]
+Working on the 1/5 fold ...
+In epoch 00001: score improved from -inf to 0.8906, saving model to Model_1.hdf5.
+In epoch 00002: score improved from 0.8906 to 0.8923, saving model to Model_1.hdf5.
+In epoch 00003: score improved from 0.8923 to 0.8927, saving model to Model_1.hdf5.
+In epoch 00004: score improved from 0.8927 to 0.8935, saving model to Model_1.hdf5.
+For the 1 fold, the Keras model achieved the score 0.8935 at the 4 epoch.
+[#    ] | ETA: 00:04:03
+Working on the 2/5 fold ...
+In epoch 00001: score improved from -inf to 0.8826, saving model to Model_2.hdf5.
+In epoch 00002: score improved from 0.8826 to 0.8851, saving model to Model_2.hdf5.
+In epoch 00004: score improved from 0.8851 to 0.8861, saving model to Model_2.hdf5.
+For the 2 fold, the Keras model achieved the score 0.8861 at the 4 epoch.
+[##   ] | ETA: 00:03:02
+Working on the 3/5 fold ...
+In epoch 00001: score improved from -inf to 0.8903, saving model to Model_3.hdf5.
+In epoch 00003: score improved from 0.8903 to 0.8908, saving model to Model_3.hdf5.
+In epoch 00004: score improved from 0.8908 to 0.8908, saving model to Model_3.hdf5.
+In epoch 00005: score improved from 0.8908 to 0.8909, saving model to Model_3.hdf5.
+For the 3 fold, the Keras model achieved the score 0.8909 at the 5 epoch.
+[###  ] | ETA: 00:02:01
+Working on the 4/5 fold ...
+In epoch 00001: score improved from -inf to 0.8891, saving model to Model_4.hdf5.
+In epoch 00002: score improved from 0.8891 to 0.8908, saving model to Model_4.hdf5.
+In epoch 00003: score improved from 0.8908 to 0.8943, saving model to Model_4.hdf5.
+For the 4 fold, the Keras model achieved the score 0.8943 at the 3 epoch.
+[#### ] | ETA: 00:01:00
+Working on the 5/5 fold ...
+In epoch 00001: score improved from -inf to 0.8724, saving model to Model_5.hdf5.
+In epoch 00002: score improved from 0.8724 to 0.8754, saving model to Model_5.hdf5.
+In epoch 00003: score improved from 0.8754 to 0.8760, saving model to Model_5.hdf5.
+In epoch 00004: score improved from 0.8760 to 0.8783, saving model to Model_5.hdf5.
+For the 5 fold, the Keras model achieved the score 0.8783 at the 4 epoch.
+[#####] | ETA: 00:00:00
+Total time elapsed: 00:05:03
+Title: 
+  Started: 02/24/2016 00:23:20
+  Finished: 02/24/2016 00:28:23
+  Total time elapsed: 00:05:03
+  CPU %: 100.000000
+  Memory %: 5.650514
+
+The best score is 0.8943 and the highest epoch is 5.
+
+Generating prediction ...
+
+Working on Model_1 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:18:14
+Title: 
+  Started: 02/24/2016 00:28:39
+  Finished: 02/24/2016 00:46:54
+  Total time elapsed: 00:18:14
+  CPU %: 100.000000
+  Memory %: 5.828854
+
+Working on Model_2 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:18:12
+Title: 
+  Started: 02/24/2016 00:47:10
+  Finished: 02/24/2016 01:05:23
+  Total time elapsed: 00:18:12
+  CPU %: 100.000000
+  Memory %: 6.425158
+
+Working on Model_3 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:18:14
+Title: 
+  Started: 02/24/2016 01:05:40
+  Finished: 02/24/2016 01:23:54
+  Total time elapsed: 00:18:14
+  CPU %: 100.000000
+  Memory %: 6.441791
+
+Working on Model_4 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:18:13
+Title: 
+  Started: 02/24/2016 01:24:11
+  Finished: 02/24/2016 01:42:25
+  Total time elapsed: 00:18:13
+  CPU %: 100.000000
+  Memory %: 6.468004
+
+Working on Model_5 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:18:14
+Title: 
+  Started: 02/24/2016 01:42:42
+  Finished: 02/24/2016 02:00:56
+  Total time elapsed: 00:18:14
+  CPU %: 100.000000
+  Memory %: 6.496546
+
