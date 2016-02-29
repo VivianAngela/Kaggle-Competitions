@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import pandas as pd
+import shutil
 
 # The path of the folder where the scripts are saved
 SCRIPTS_FOLDER_PATH = os.path.dirname(os.path.realpath(__file__))
@@ -27,9 +28,9 @@ VGG_FACE_IMAGE_SIZE = 224
 # Variables related to congealingcomplex
 CONGEALINGCOMPLEX_PATH = "/opt/congealingcomplex"
 
-# Variables related to Keras models
-KERAS_MODEL_FOLDER_NAME = "keras_models"
+# Variables related to Keras and scikit-learn models
 KERAS_MODEL_EXTENSION = ".hdf5"
+SCIKIT_LEARN_EXTENSION = ".pkl"
 
 # The path of the folder where the submission files are saved
 SUBMISSIONS_FOLDER_PATH = os.path.join(SCRIPTS_FOLDER_PATH, "Submissions")
@@ -44,3 +45,30 @@ def read_from_file(file_path):
 
 def write_to_file(file_path, file_content):
     pd.Series(file_content).to_csv(file_path, header=False, index=False)
+
+def get_working_directory(description):
+    """Get the path of working directory.
+    
+    :param description: the folder name of the working directory
+    :type description: string
+    :return: the path of working directory
+    :rtype: string
+    """
+
+    return os.path.join("/tmp", description)
+
+def reset_working_directory(description):
+    """Reset the working directory.
+    
+    :param description: the folder name of the working directory
+    :type description: string
+    :return: the working directory will be reset
+    :rtype: None
+    """
+
+    print("Resetting working directory: {}".format(description))
+
+    # Remove the old directory and create a new one
+    working_directory = get_working_directory(description)
+    shutil.rmtree(working_directory, ignore_errors=True)
+    os.makedirs(working_directory)

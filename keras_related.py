@@ -4,40 +4,9 @@ from keras.layers.core import Dense, Dropout, Activation
 from keras.layers.normalization import BatchNormalization
 from keras.models import Sequential
 from keras.utils import np_utils
-import common
 import evaluation
 import numpy as np
 import os
-import shutil
-
-def get_working_directory(description):
-    """Get the path of working directory.
-    
-    :param description: the folder name of the working directory
-    :type description: string
-    :return: the path of working directory
-    :rtype: string
-    """
-
-    return os.path.join(common.DATA_PATH, common.KERAS_MODEL_FOLDER_NAME, description)
-
-def reset_working_directory(description):
-    """Reset the working directory of Keras.
-    
-    :param description: the folder name of the working directory
-    :type description: string
-    :return: the working directory will be reset
-    :rtype: None
-    """
-
-    print("Resetting working directory: {}".format(description))
-
-    global working_directory
-    working_directory = get_working_directory(description)
-
-    # Remove the old directory and create a new one
-    shutil.rmtree(working_directory, ignore_errors=True)
-    os.makedirs(working_directory)
 
 def init_model(dimension, unique_label_num=2):
     """Init a keras model which could be found in 
@@ -120,7 +89,8 @@ class Customized_Callback(Callback):
         score = evaluation.compute_Weighted_AUC(self.Y_test, prediction)
 
         if self.best_score < 0 or score > self.best_score:
-            print("In epoch {:05d}: {} improved from {:.4f} to {:.4f}, saving model to {}.".format(epoch + 1, self.monitor, self.best_score, score, os.path.basename(model_path)))
+            print("In epoch {:05d}: {} improved from {:.4f} to {:.4f}, saving model to {}.".format(\
+                    epoch + 1, self.monitor, self.best_score, score, os.path.basename(model_path)))
             self.best_score_index = epoch + 1
             self.best_score = score
             self.model.save_weights(model_path, overwrite=True)
@@ -137,7 +107,7 @@ class Customized_Callback(Callback):
 
         return (self.best_score_index, self.best_score)
 
-def train_model(X_train, Y_train, X_test, Y_test, model_name, nb_epoch):
+def train_model(X_train, Y_train, X_test, Y_test, model_path, nb_epoch):
     """Training phase.
     
     :param X_train: the training attributes
@@ -148,8 +118,8 @@ def train_model(X_train, Y_train, X_test, Y_test, model_name, nb_epoch):
     :type X_test: numpy array
     :param Y_test: the testing labels
     :type Y_test: numpy array
-    :param model_name: the name of the model file
-    :type model_name: string
+    :param model_path: the path of the model file
+    :type model_path: string
     :param nb_epoch: the maximum number of epochs
     :type nb_epoch: int
     :return: best_score_index refers to the index of the epoch, 
@@ -163,7 +133,6 @@ def train_model(X_train, Y_train, X_test, Y_test, model_name, nb_epoch):
     model = init_model(dimension, unique_label_num)
 
     # Start the training phase
-    model_path = os.path.join(working_directory, model_name)
     customized_callback = Customized_Callback(model_path=model_path, X_test=X_test, Y_test=Y_test)
     categorical_Y_train = np_utils.to_categorical(Y_train, unique_label_num)
     model.fit(X_train, categorical_Y_train, batch_size=32, nb_epoch=nb_epoch, verbose=0, callbacks=[customized_callback])

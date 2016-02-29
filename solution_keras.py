@@ -17,6 +17,8 @@ METRIC_LIST_DICT = {
     "_vgg_face.csv":["cosine", "sokalsneath", "dice", "braycurtis", "kulsinski", \
                     "correlation", "russellrao", "matching", "sokalmichener", "rogerstanimoto"]}
 
+NB_EPOCH_DICT = {"_open_face.csv":5, "_vgg_face.csv":5}
+
 def perform_training(image_feature_list, image_index_list, description, feature_extension, nb_epoch):
     """Perform training phase.
     
@@ -37,7 +39,8 @@ def perform_training(image_feature_list, image_index_list, description, feature_
     print("Performing training phase ...")
 
     # Reset the working directory
-    keras_related.reset_working_directory(description)
+    common.reset_working_directory(description)
+    working_directory = common.get_working_directory(description)
 
     # Cross Validation
     fold_num = 5
@@ -58,7 +61,8 @@ def perform_training(image_feature_list, image_index_list, description, feature_
 
         # Perform training
         model_name = "Model_{:d}".format(fold_index + 1) + common.KERAS_MODEL_EXTENSION
-        best_score_index, best_score = keras_related.train_model(X_train, Y_train, X_test, Y_test, model_name, nb_epoch)
+        model_path = os.path.join(working_directory, model_name)
+        best_score_index, best_score = keras_related.train_model(X_train, Y_train, X_test, Y_test, model_path, nb_epoch)
         best_score_array[fold_index] = best_score
         best_score_index_array[fold_index] = best_score_index
 
@@ -91,7 +95,7 @@ def generate_prediction(description, testing_file_content, testing_image_feature
 
     print("\nGenerating prediction ...")
 
-    working_directory = keras_related.get_working_directory(description)
+    working_directory = common.get_working_directory(description)
     model_path_rule = os.path.join(working_directory, "*" + common.KERAS_MODEL_EXTENSION)
     metric_list = METRIC_LIST_DICT[feature_extension]
     for model_path in sorted(glob.glob(model_path_rule)):
@@ -129,15 +133,13 @@ def generate_prediction(description, testing_file_content, testing_image_feature
         prediction_file_name = prediction_file_prefix + model_name + "_" + str(int(time.time())) + ".csv"
         solution_basic.write_prediction(testing_file_content, np.array(prediction_list), prediction_file_name)
 
-def make_prediction(facial_image_extension, feature_extension, nb_epoch=100):
+def make_prediction(facial_image_extension, feature_extension):
     """Make prediction.
     
     :param facial_image_extension: the extension of the facial images
     :type facial_image_extension: string
     :param feature_extension: the extension of the feature files
     :type feature_extension: string
-    :param nb_epoch: the maximum number of epochs
-    :type nb_epoch: int
     :return: the prediction file will be saved to disk
     :rtype: None
     """
@@ -151,7 +153,8 @@ def make_prediction(facial_image_extension, feature_extension, nb_epoch=100):
         solution_basic.load_feature(facial_image_extension, feature_extension)
 
     # Perform training
-    description = selected_facial_image + " with " + selected_feature
+    description = selected_facial_image + " with " + selected_feature + " using keras"
+    nb_epoch = NB_EPOCH_DICT[feature_extension]
     perform_training(training_image_feature_list, training_image_index_list, description, feature_extension, nb_epoch)
 
     # Load testing file
