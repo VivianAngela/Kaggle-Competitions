@@ -1,68 +1,67 @@
 from sklearn.cross_validation import LabelKFold
-from sklearn.grid_search import ParameterGrid
-from sklearn.svm import SVC
+from sklearn.externals import joblib
 import common
-import evaluation
+import glob
 import itertools
 import numpy as np
 import os
 import pandas as pd
 import prepare_data
 import pyprind
+import sklearn_related
 import solution_basic
 import time
 
-def get_best_classifier(image_feature_list, image_index_list):
-    """Select among a list of classifiers and find the best one.
+METRIC_LIST_DICT = {
+    "_open_face.csv":["correlation", "l1", "euclidean", "braycurtis", "sqeuclidean", \
+                    "cosine", "minkowski", "l2", "canberra", "chebyshev"], \
+    "_vgg_face.csv":["cosine", "sokalsneath", "dice", "braycurtis", "kulsinski", \
+                    "correlation", "russellrao", "matching", "sokalmichener", "rogerstanimoto"]}
+
+def perform_training(image_feature_list, image_index_list, description, feature_extension):
+    """Perform training phase.
     
     :param image_feature_list: the features of the images
     :type image_feature_list: list
     :param image_index_list: the indexes of the images
     :type image_index_list: list
-    :return: the best classifier
-    :rtype: object
+    :param description: the folder name of the working directory
+    :type description: string
+    :param feature_extension: the extension of the feature files
+    :type feature_extension: string
+    :return: the model files will be saved to disk
+    :rtype: None
     """
 
-    print("Evaluating the performance of the classifiers ...")
+    print("Performing training phase ...")
 
-    # Set the parameters for SVC
-    param_grid = [{"C": [1, 10, 100, 1000], "gamma": ["auto"], "kernel": ["linear"]}, \
-                  {"C": [1, 10, 100, 1000], "gamma": [0.001, 0.0001], "kernel": ["rbf"]}]
-    parameters_combinations = ParameterGrid(param_grid)
-
-    # Get a list of different classifiers
-    classifier_list = []
-    for current_parameters in parameters_combinations:
-        current_classifier = SVC(C=current_parameters["C"],
-                                 kernel=current_parameters["kernel"],
-                                 gamma=current_parameters["gamma"],
-                                 probability=True)
-        classifier_list.append(current_classifier)
+    # Reset the working directory
+    common.reset_working_directory(description)
+    working_directory = common.get_working_directory(description)
 
     # Cross Validation
     fold_num = 5
-    score_record = np.zeros((len(classifier_list), fold_num))
+    best_score_array = np.zeros(fold_num)
     label_kfold = LabelKFold(image_index_list, n_folds=fold_num)
 
     # Add progress bar
     progress_bar = pyprind.ProgBar(fold_num, monitor=True)
 
+    metric_list = METRIC_LIST_DICT[feature_extension]
     for fold_index, fold_item in enumerate(label_kfold):
         print("\nWorking on the {:d}/{:d} fold ...".format(fold_index + 1, fold_num))
 
         # Generate final data set
-        X_train, Y_train = solution_basic.convert_to_final_data_set(image_feature_list, image_index_list, fold_item[0], 1)
-        X_test, Y_test = solution_basic.convert_to_final_data_set(image_feature_list, image_index_list, fold_item[1], None)
+        X_train, Y_train = solution_basic.convert_to_final_data_set(image_feature_list, image_index_list, fold_item[0], 1, metric_list)
+        X_test, Y_test = solution_basic.convert_to_final_data_set(image_feature_list, image_index_list, fold_item[1], None, metric_list)
 
-        # Loop through the classifiers
-        for classifier_index, classifier in enumerate(classifier_list):
-            classifier.fit(X_train, Y_train)
-            probability_estimates = classifier.predict_proba(X_test)
-            prediction = probability_estimates[:, 1]
-            score = evaluation.compute_Weighted_AUC(Y_test, prediction)
-            score_record[classifier_index, fold_index] = score
+        # Perform training
+        model_name = "Model_{:d}".format(fold_index + 1) + common.SCIKIT_LEARN_EXTENSION
+        model_path = os.path.join(working_directory, model_name)
+        best_score = sklearn_related.train_model(X_train, Y_train, X_test, Y_test, model_path)
+        best_score_array[fold_index] = best_score
 
-            print("Classifier {:d} achieved {:.4f}.".format(classifier_index, score))
+        print("For the {:d} fold, the sklearn model achieved the score {:.4f}.".format(fold_index + 1, best_score))
 
         # Update progress bar
         progress_bar.update()
@@ -70,57 +69,61 @@ def get_best_classifier(image_feature_list, image_index_list):
     # Report tracking information
     print(progress_bar)
 
-    # Print the info of the best classifier
-    arithmetic_mean = np.mean(score_record, axis=1)
-    standard_deviation = np.std(score_record, axis=1)
-    best_classifier_index = np.argmax(arithmetic_mean)
-    print("\nThe classifier {:d} achieved best performance with mean score {:.4f} and standard deviation {:.4f}.".format(\
-                best_classifier_index, arithmetic_mean[best_classifier_index], standard_deviation[best_classifier_index]))
-    print("The optimal parameters are {}.\n".format(parameters_combinations[best_classifier_index]))
+    print("\nThe best score is {:.4f}.".format(np.max(best_score_array)))
 
-    return classifier_list[best_classifier_index]
-
-def generate_prediction(classifier, testing_file_content, testing_image_feature_dict, prediction_file_prefix):
+def generate_prediction(description, testing_file_content, testing_image_feature_dict, prediction_file_prefix, feature_extension):
     """Generate prediction.
     
-    :param classifier: the classifier
-    :type classifier: object
+    :param description: the folder name of the working directory
+    :type description: string
     :param testing_file_content: the content in the testing file
     :type testing_file_content: numpy array
     :param testing_image_feature_dict: the features of the testing images which is saved in a dict
     :type testing_image_feature_dict: dict
     :param prediction_file_prefix: the prefix of the prediction file
     :type prediction_file_prefix: string
+    :param feature_extension: the extension of the feature files
+    :type feature_extension: string
     :return: the prediction file will be saved to disk
     :rtype: None
     """
 
     print("\nGenerating prediction ...")
 
-    # Add progress bar
-    progress_bar = pyprind.ProgBar(testing_file_content.shape[0], monitor=True)
+    working_directory = common.get_working_directory(description)
+    model_path_rule = os.path.join(working_directory, "*" + common.SCIKIT_LEARN_EXTENSION)
+    metric_list = METRIC_LIST_DICT[feature_extension]
+    for model_path in sorted(glob.glob(model_path_rule)):
+        model_name = os.path.basename(os.path.splitext(model_path)[0])
+        print("\nWorking on {} ...".format(model_name))
 
-    # Generate prediction
-    prediction_list = []
-    for _, file_1_name, file_2_name in testing_file_content:
-        file_1_feature = testing_image_feature_dict[file_1_name]
-        file_2_feature = testing_image_feature_dict[file_2_name]
-        final_feature = solution_basic.get_final_feature(file_1_feature, file_2_feature)
-        final_feature = final_feature.reshape(1, -1)
+        # Load the sklearn model
+        classifier = joblib.load(model_path)
 
-        probability_estimates = classifier.predict_proba(final_feature)
-        prediction = probability_estimates[0, 1]
-        prediction_list.append(prediction)
+        # Add progress bar
+        progress_bar = pyprind.ProgBar(testing_file_content.shape[0], monitor=True)
 
-        # Update progress bar
-        progress_bar.update()
+        # Generate prediction
+        prediction_list = []
+        for _, file_1_name, file_2_name in testing_file_content:
+            file_1_feature = testing_image_feature_dict[file_1_name]
+            file_2_feature = testing_image_feature_dict[file_2_name]
+            final_feature = solution_basic.get_final_feature(file_1_feature, file_2_feature, metric_list)
+            final_feature = final_feature.reshape(1, -1)
 
-    # Report tracking information
-    print(progress_bar)
+            probability_estimates = classifier.predict_proba(final_feature)
+            prediction = probability_estimates[0, 1]
+            prediction_list.append(prediction)
 
-    # Write prediction
-    prediction_file_name = prediction_file_prefix + str(int(time.time())) + ".csv"
-    solution_basic.write_prediction(testing_file_content, np.array(prediction_list), prediction_file_name)
+            # Update progress bar
+            progress_bar.update()
+
+        # Report tracking information
+        print(progress_bar)
+
+        # Write prediction
+        prediction_file_name = prediction_file_prefix + model_name + "_" + str(int(time.time())) + ".csv"
+        solution_basic.write_prediction(testing_file_content, np.array(prediction_list), prediction_file_name)
 
 def make_prediction(facial_image_extension, feature_extension):
     """Make prediction.
@@ -141,13 +144,9 @@ def make_prediction(facial_image_extension, feature_extension):
     training_image_feature_list, training_image_index_list, testing_image_feature_dict = \
         solution_basic.load_feature(facial_image_extension, feature_extension)
 
-    # Find the best classifier
-    classifier = get_best_classifier(training_image_feature_list, training_image_index_list)
-
-    # Generate training data
-    X_train, Y_train = solution_basic.convert_to_final_data_set(training_image_feature_list, \
-                                                training_image_index_list, range(len(training_image_feature_list)), 1)
-    classifier.fit(X_train, Y_train)
+    # Perform training
+    description = selected_facial_image + " with " + selected_feature + " using sklearn"
+    perform_training(training_image_feature_list, training_image_index_list, description, feature_extension)
 
     # Load testing file
     testing_file_path = os.path.join(common.DATA_PATH, common.TESTING_FILE_NAME)
@@ -155,8 +154,8 @@ def make_prediction(facial_image_extension, feature_extension):
                                        skiprows=0, na_filter=False, low_memory=False).as_matrix()
 
     # Generate prediction
-    prediction_file_prefix = "prediction_" + selected_facial_image + "_" + selected_feature + "_sklearn_"
-    generate_prediction(classifier, testing_file_content, testing_image_feature_dict, prediction_file_prefix)
+    prediction_file_prefix = "Aurora_" + selected_facial_image + "_" + selected_feature + "_sklearn_"
+    generate_prediction(description, testing_file_content, testing_image_feature_dict, prediction_file_prefix, feature_extension)
 
 def run():
     # Crop out facial images and retrieve features. Ideally, one only need to call this function once.
