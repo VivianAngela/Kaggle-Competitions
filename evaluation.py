@@ -20,7 +20,7 @@ def get_ranks(input_array):
     ranks = order.argsort()
     return ranks
 
-def compute_MCC(y_true, y_score, threshold_num=100):
+def compute_MCC(y_true, y_score, threshold_num=500):
     """Compute the Matthews Correlation Coefficient.
     
     :param y_true: true binary labels in range {0, 1}
@@ -46,9 +46,9 @@ def compute_MCC(y_true, y_score, threshold_num=100):
     MCC_array = np.array(MCC_list)
 
     # Illustrate threshold and MCC values
-    pylab.figure()
-    pylab.plot(threshold_array / np.max(ranks), MCC_array)
-    pylab.show()
+    # pylab.figure()
+    # pylab.plot(threshold_array / np.max(ranks), MCC_array)
+    # pylab.show()
 
     return np.max(MCC_array)
 
@@ -186,8 +186,10 @@ def perform_evaluation():
     # List all csv files in current folder and evaluate them
     submission_file_path_list = glob.glob(os.path.join(common.SUBMISSIONS_FOLDER_PATH, "*.csv"))
     submission_file_path_list = sorted(submission_file_path_list)
+    submission_file_name_list = []
+    score_list = []
     for submission_file_path in submission_file_path_list:
-        if submission_file_path == groundtruth_file_path:
+        if submission_file_path == groundtruth_file_path or "Anonymous" in submission_file_path:
             continue
 
         # Read current submission file
@@ -195,11 +197,23 @@ def perform_evaluation():
         submission_label = submission_file_content[:, 1]
 
         # Compute Weighted AUC or MCC of current submission file
-        # score = compute_Weighted_AUC(groundtruth_label, submission_label)
+        score = compute_Weighted_AUC(groundtruth_label, submission_label)
+        # score = compute_tpr_with_fpr(groundtruth_label, submission_label)
         # score = compute_MCC(groundtruth_label, submission_label)
-        score = compute_tpr_with_fpr(groundtruth_label, submission_label)
 
-        print("{} achieved {:.4f}.".format(os.path.basename(submission_file_path), score))
+        submission_file_name = os.path.basename(submission_file_path)
+        print("{} achieved {:.4f}.".format(submission_file_name, score))
+
+        submission_file_name_list.append(submission_file_name)
+        score_list.append(score)
+
+    # Print the ranks
+    print("\nThe ranks are as follows:")
+    ranks = get_ranks(np.array(score_list))
+    for current_index in range(len(submission_file_name_list)):
+        flag = ranks == (np.max(ranks) - current_index)
+        print("{}\t{:.4f}\t{:d}".format(np.array(submission_file_name_list)[flag][0], \
+                                        np.array(score_list)[flag][0], current_index + 1))
 
 def combine_submissions(submission_file_name_rule_list):
     """Combine submissions.
@@ -235,7 +249,7 @@ def combine_submissions(submission_file_name_rule_list):
                                                  "Prediction": mean_submission})
     mean_submission_file_content.to_csv(os.path.join(\
                                         common.SUBMISSIONS_FOLDER_PATH, \
-                                        "mean_submission_" + str(int(time.time())) + ".csv"), \
+                                        "mean_" + str(int(time.time())) + ".csv"), \
                                         index=False, header=True)
 
     # Generate median submission file
@@ -245,11 +259,8 @@ def combine_submissions(submission_file_name_rule_list):
                                                    "Prediction": median_submission})
     median_submission_file_content.to_csv(os.path.join(\
                                         common.SUBMISSIONS_FOLDER_PATH, \
-                                        "median_submission_" + str(int(time.time())) + ".csv"), \
+                                        "median_" + str(int(time.time())) + ".csv"), \
                                         index=False, header=True)
 
 if __name__ == "__main__":
-    # combine_submissions(["prediction_open_face_open_face_keras*.csv"])
-    # combine_submissions(["prediction_bbox_vgg_face_keras*.csv"])
-
     perform_evaluation()
