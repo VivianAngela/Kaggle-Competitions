@@ -1,0 +1,165 @@
+Making prediction by using facial image "open_face" with feature "vgg_face" ...
+
+Loading feature ...
+Feature loaded successfully.
+
+Performing training phase ...
+Resetting working directory: open_face with vgg_face using sklearn
+0%  100%
+[     ]
+Working on the 1/5 fold ...
+Classifier 0 achieved 0.9757.
+Score improved from -inf to 0.9757, saving model to Model_1.pkl.
+Classifier 1 achieved 0.9758.
+Score improved from 0.9757 to 0.9758, saving model to Model_1.pkl.
+Classifier 2 achieved 0.9755.
+Classifier 3 achieved 0.9912.
+Score improved from 0.9758 to 0.9912, saving model to Model_1.pkl.
+Classifier 4 achieved 0.9535.
+Classifier 5 achieved 0.9885.
+Classifier 6 achieved 0.9724.
+Classifier 7 achieved 0.9535.
+Classifier 8 achieved 0.9756.
+Classifier 9 achieved 0.9724.
+Classifier 10 achieved 0.9757.
+Classifier 11 achieved 0.9756.
+For the 1 fold, the sklearn model achieved the score 0.9912.
+[#    ] | ETA: 00:14:54
+Working on the 2/5 fold ...
+Classifier 0 achieved 0.9766.
+Score improved from -inf to 0.9766, saving model to Model_2.pkl.
+Classifier 1 achieved 0.9827.
+Score improved from 0.9766 to 0.9827, saving model to Model_2.pkl.
+Classifier 2 achieved 0.9509.
+Classifier 3 achieved 0.9921.
+Score improved from 0.9827 to 0.9921, saving model to Model_2.pkl.
+Classifier 4 achieved 0.9767.
+Classifier 5 achieved 0.9820.
+Classifier 6 achieved 0.9767.
+Classifier 7 achieved 0.9767.
+Classifier 8 achieved 0.9767.
+Classifier 9 achieved 0.9767.
+Classifier 10 achieved 0.9797.
+Classifier 11 achieved 0.9767.
+For the 2 fold, the sklearn model achieved the score 0.9921.
+[##   ] | ETA: 00:08:47
+Working on the 3/5 fold ...
+Classifier 0 achieved 0.9725.
+Score improved from -inf to 0.9725, saving model to Model_3.pkl.
+Classifier 1 achieved 0.9725.
+Score improved from 0.9725 to 0.9725, saving model to Model_3.pkl.
+Classifier 2 achieved 0.9951.
+Score improved from 0.9725 to 0.9951, saving model to Model_3.pkl.
+Classifier 3 achieved 0.9950.
+Classifier 4 achieved 0.9724.
+Classifier 5 achieved 0.7881.
+Classifier 6 achieved 0.9724.
+Classifier 7 achieved 0.9724.
+Classifier 8 achieved 0.9725.
+Classifier 9 achieved 0.9724.
+Classifier 10 achieved 0.9725.
+Classifier 11 achieved 0.9725.
+For the 3 fold, the sklearn model achieved the score 0.9951.
+[###  ] | ETA: 00:05:21
+Working on the 4/5 fold ...
+Classifier 0 achieved 0.9767.
+Score improved from -inf to 0.9767, saving model to Model_4.pkl.
+Classifier 1 achieved 0.9767.
+Classifier 2 achieved 0.9928.
+Score improved from 0.9767 to 0.9928, saving model to Model_4.pkl.
+Classifier 3 achieved 0.9928.
+Score improved from 0.9928 to 0.9928, saving model to Model_4.pkl.
+Classifier 4 achieved 0.9765.
+Classifier 5 achieved 0.9549.
+Classifier 6 achieved 0.9765.
+Classifier 7 achieved 0.9765.
+Classifier 8 achieved 0.9766.
+Classifier 9 achieved 0.9765.
+Classifier 10 achieved 0.9767.
+Classifier 11 achieved 0.9766.
+For the 4 fold, the sklearn model achieved the score 0.9928.
+[#### ] | ETA: 00:02:35
+Working on the 5/5 fold ...
+Classifier 0 achieved 0.9779.
+Score improved from -inf to 0.9779, saving model to Model_5.pkl.
+Classifier 1 achieved 0.9776.
+Classifier 2 achieved 0.9019.
+Classifier 3 achieved 0.9969.
+Score improved from 0.9779 to 0.9969, saving model to Model_5.pkl.
+Classifier 4 achieved 0.9584.
+Classifier 5 achieved 0.9301.
+Classifier 6 achieved 0.9781.
+Classifier 7 achieved 0.9584.
+Classifier 8 achieved 0.9780.
+Classifier 9 achieved 0.9781.
+Classifier 10 achieved 0.9778.
+Classifier 11 achieved 0.9780.
+For the 5 fold, the sklearn model achieved the score 0.9969.
+[#####] | ETA: 00:00:00
+Total time elapsed: 00:12:40
+Title: 
+  Started: 02/29/2016 21:47:39
+  Finished: 02/29/2016 22:00:20
+  Total time elapsed: 00:12:40
+  CPU %: 100.000000
+  Memory %: 2.284693
+
+The best score is 0.9969.
+
+Generating prediction ...
+
+Working on Model_1 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:26:10
+Title: 
+  Started: 02/29/2016 22:00:20
+  Finished: 02/29/2016 22:26:31
+  Total time elapsed: 00:26:10
+  CPU %: 100.000000
+  Memory %: 2.810002
+
+Working on Model_2 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:23:00
+Title: 
+  Started: 02/29/2016 22:26:33
+  Finished: 02/29/2016 22:49:33
+  Total time elapsed: 00:23:00
+  CPU %: 100.000000
+  Memory %: 2.810002
+
+Working on Model_3 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:21:27
+Title: 
+  Started: 02/29/2016 22:49:35
+  Finished: 02/29/2016 23:11:03
+  Total time elapsed: 00:21:27
+  CPU %: 100.000000
+  Memory %: 2.809969
+
+Working on Model_4 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:21:25
+Title: 
+  Started: 02/29/2016 23:11:04
+  Finished: 02/29/2016 23:32:30
+  Total time elapsed: 00:21:25
+  CPU %: 100.000000
+  Memory %: 2.812101
+
+Working on Model_5 ...
+0%                          100%
+[##############################] | ETA: 00:00:00
+Total time elapsed: 00:21:26
+Title: 
+  Started: 02/29/2016 23:32:31
+  Finished: 02/29/2016 23:53:58
+  Total time elapsed: 00:21:26
+  CPU %: 100.000000
+  Memory %: 2.812069
+
