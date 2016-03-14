@@ -15,7 +15,7 @@ def weighted_AUC(weight_distribution):
     pylab.plot(x, y, "yellowgreen", label="ROC Curve")
 
     for threshold in threshold_array:
-        pylab.plot(x, np.ones(x.size) * threshold, "darkorange")
+        pylab.plot(x, np.ones(x.size) * threshold, "lightskyblue")
 
     text_y_loc_array = threshold_array - step / 1.2
     text_y_loc_array = np.hstack([text_y_loc_array, text_y_loc_array[-1] + step])
@@ -30,5 +30,5 @@ def weighted_AUC(weight_distribution):
     pylab.title("ROC Curve with Specific Weight Distribution")
     pylab.show()
 
-weighted_AUC(np.arange(4, -1, -1))
 weighted_AUC(np.arange(0, 5, 1))
+weighted_AUC(np.arange(4, -1, -1))
