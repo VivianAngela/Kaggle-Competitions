@@ -14,7 +14,7 @@ def conventional_AUC():
     pylab.legend(loc="lower right")
     pylab.xlabel("False Positive Rate", fontsize="large")
     pylab.ylabel("True Positive Rate", fontsize="large")
-    pylab.title("ROC Curve")
+    pylab.title("Comparison between ROC curves")
     pylab.show()
 
 conventional_AUC()
