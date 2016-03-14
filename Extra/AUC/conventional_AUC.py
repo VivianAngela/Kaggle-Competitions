@@ -10,6 +10,7 @@ def conventional_AUC():
     pylab.figure()
     pylab.plot(x, y, "yellowgreen", label="Curve A")
     pylab.plot(1 - y, 1 - x, "lightskyblue", label="Curve B")
+    pylab.gca().set_aspect('equal', adjustable='box')
     pylab.legend(loc="lower right")
     pylab.xlabel("False Positive Rate", fontsize="large")
     pylab.ylabel("True Positive Rate", fontsize="large")
