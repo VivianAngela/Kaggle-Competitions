@@ -24,7 +24,7 @@ def weighted_AUC(weight_distribution):
 
     pylab.xlim([0, 1])
     pylab.ylim([0, 1])
-    pylab.gca().set_aspect('equal', adjustable='box')
+    pylab.gca().set_aspect("equal", adjustable="box")
     pylab.xlabel("False Positive Rate", fontsize="large")
     pylab.ylabel("True Positive Rate", fontsize="large")
     pylab.title("ROC Curve with Specific Weight Distribution")
