@@ -1,9 +1,11 @@
+from itertools import product
 from sklearn.metrics import auc, roc_curve, matthews_corrcoef
 import common
 import glob
 import numpy as np
 import os
 import pandas as pd
+import prepare_data
 import pylab
 import time
 
@@ -215,52 +217,44 @@ def perform_evaluation():
         print("{}\t{:.4f}\t{:d}".format(np.array(submission_file_name_list)[flag][0], \
                                         np.array(score_list)[flag][0], current_index + 1))
 
-def combine_submissions(submission_file_name_rule_list):
+def combine_submissions():
     """Combine submissions.
     
-    :param submission_file_name_rule_list: the file name rules of the submissions
-    :type submission_file_name_rule_list: list
     :return: the new submission file will be created
     :rtype: None
     """
 
-    # Get the list of submission files based on the rules
-    submission_file_path_list = []
-    for submission_file_name_rule in submission_file_name_rule_list:
-        current_submission_file_path_list = glob.glob(os.path.join(\
-                                                                   common.SUBMISSIONS_FOLDER_PATH, \
-                                                                   submission_file_name_rule))
-        for current_submission_file_path in current_submission_file_path_list:
-            if current_submission_file_path not in submission_file_path_list:
-                submission_file_path_list.append(current_submission_file_path)
+    facial_image_extension_list = [os.path.splitext(item)[0][1:] for item in prepare_data.FACIAL_IMAGE_EXTENSION_LIST]
+    feature_extension_list = [os.path.splitext(item)[0][1:] for item in prepare_data.FEATURE_EXTENSION_LIST]
+    classifier_name_list = ["keras", "sklearn"]
 
-    # Read submission files
-    submission_label_list = []
-    for submission_file_path in submission_file_path_list:
-        submission_file_content = pd.read_csv(submission_file_path, skiprows=0).as_matrix()
-        submission_label = submission_file_content[:, 1]
-        submission_label_list.append(submission_label)
-    submission_label_array = np.array(submission_label_list)
+    for facial_image_extension, feature_extension, classifier_name in \
+        product(facial_image_extension_list, feature_extension_list, classifier_name_list):
 
-    # Generate mean submission file
-    mean_submission = np.mean(submission_label_array, axis=0)
-    mean_submission_file_content = pd.DataFrame({\
-                                                 "Id": np.arange(mean_submission.shape[0]), \
-                                                 "Prediction": mean_submission})
-    mean_submission_file_content.to_csv(os.path.join(\
-                                        common.SUBMISSIONS_FOLDER_PATH, \
-                                        "mean_" + str(int(time.time())) + ".csv"), \
-                                        index=False, header=True)
+        prediction_file_prefix = "Aurora_" + facial_image_extension + "_" + feature_extension + "_" + classifier_name
+        submission_file_name_rule = prediction_file_prefix + "_Model_*.csv"
+        print("Working on {:s} ...".format(submission_file_name_rule))
 
-    # Generate median submission file
-    median_submission = np.median(submission_label_array, axis=0)
-    median_submission_file_content = pd.DataFrame({\
-                                                   "Id": np.arange(median_submission.shape[0]), \
-                                                   "Prediction": median_submission})
-    median_submission_file_content.to_csv(os.path.join(\
-                                        common.SUBMISSIONS_FOLDER_PATH, \
-                                        "median_" + str(int(time.time())) + ".csv"), \
-                                        index=False, header=True)
+        # Read the submission files
+        submission_label_list = []
+        submission_file_path_list = glob.glob(os.path.join(common.SUBMISSIONS_FOLDER_PATH, submission_file_name_rule))
+        for submission_file_path in submission_file_path_list:
+            submission_file_content = pd.read_csv(submission_file_path, skiprows=0)
+            submission_label = submission_file_content["Prediction"].as_matrix()
+            submission_label_list.append(submission_label)
+
+        # Generate the mean submission file
+        submission_file_content["Prediction"] = np.mean(submission_label_list, axis=0)
+        submission_file_path = os.path.join(common.SUBMISSIONS_FOLDER_PATH,
+                                            prediction_file_prefix + "_mean_" + str(int(time.time())) + ".csv")
+        submission_file_content.to_csv(submission_file_path, index=False)
+
+        # Generate the median submission file
+        submission_file_content["Prediction"] = np.median(submission_label_list, axis=0)
+        submission_file_path = os.path.join(common.SUBMISSIONS_FOLDER_PATH,
+                                            prediction_file_prefix + "_median_" + str(int(time.time())) + ".csv")
+        submission_file_content.to_csv(submission_file_path, index=False)
 
 if __name__ == "__main__":
+    # combine_submissions()
     perform_evaluation()
