@@ -48,7 +48,7 @@ for TeamName, DisplayName, color in zip(TeamName_list, DisplayName_list, color_l
     if max_consumed_days != selected_records[-1, 0]:
         selected_records = np.vstack([selected_records, [max_consumed_days, selected_records[-1, 1]]])
 
-    pylab.step(selected_records[:, 0], selected_records[:, 1], where="post", color=color, label=DisplayName)
+    pylab.step(selected_records[:, 0], selected_records[:, 1], where="post", color=color, label=DisplayName, linewidth=2)
 
 pylab.xlabel("Elapsed Days")
 pylab.ylabel("Weighted AUC Score on the Private Leaderboard")
