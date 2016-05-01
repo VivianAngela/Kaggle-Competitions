@@ -3,7 +3,8 @@ from sklearn.cross_validation import StratifiedKFold, StratifiedShuffleSplit
 from xgboost.sklearn import XGBClassifier
 import numpy as np
 
-N_FOLDS = 5
+N_FOLDS = 3
+CV_NUM = 3
 EVAL_METRIC = "auc"
 EARLY_STOPPING_ROUNDS = 100
 N_ESTIMATORS = 1000000
@@ -13,13 +14,14 @@ OPTIMAL_LEARNING_RATE = 0.01
 
 def evaluate_estimator(estimator, X_train, Y_train):
     best_score_list = []
-    cv_object = StratifiedKFold(Y_train, n_folds=N_FOLDS, shuffle=True, random_state=0)
-    for train_indexes, validate_indexes in cv_object:
-        cv_X_train, cv_X_validate = X_train[train_indexes], X_train[validate_indexes]
-        cv_Y_train, cv_Y_validate = Y_train[train_indexes], Y_train[validate_indexes]
-        estimator.fit(cv_X_train, cv_Y_train, eval_set=[(cv_X_validate, cv_Y_validate)], eval_metric=EVAL_METRIC,
-                      early_stopping_rounds=EARLY_STOPPING_ROUNDS, verbose=False)
-        best_score_list.append(estimator.best_score)
+    for cv_index in range(CV_NUM):
+        cv_object = StratifiedKFold(Y_train, n_folds=N_FOLDS, shuffle=True, random_state=cv_index)
+        for train_indexes, validate_indexes in cv_object:
+            cv_X_train, cv_X_validate = X_train[train_indexes], X_train[validate_indexes]
+            cv_Y_train, cv_Y_validate = Y_train[train_indexes], Y_train[validate_indexes]
+            estimator.fit(cv_X_train, cv_Y_train, eval_set=[(cv_X_validate, cv_Y_validate)], eval_metric=EVAL_METRIC,
+                          early_stopping_rounds=EARLY_STOPPING_ROUNDS, verbose=False)
+            best_score_list.append(estimator.best_score)
 
     print("The median best_score is {:.4f}.".format(np.median(best_score_list)))
     return np.median(best_score_list)
@@ -82,7 +84,7 @@ def perform_tuning(X_train, Y_train):
     print(optimal_parameters)
     return optimal_parameters
 
-def generate_prediction(X_train, Y_train, X_test, optimal_parameters, train_size=0.8, random_state=0):
+def generate_prediction(X_train, Y_train, X_test, optimal_parameters, train_size=(N_FOLDS - 1) / N_FOLDS, random_state=0):
     optimal_max_depth, optimal_min_child_weight, optimal_subsample, optimal_colsample_bytree = optimal_parameters
     optimal_estimator = XGBClassifier(max_depth=optimal_max_depth, learning_rate=OPTIMAL_LEARNING_RATE, n_estimators=N_ESTIMATORS,
                                       min_child_weight=optimal_min_child_weight, subsample=optimal_subsample,
