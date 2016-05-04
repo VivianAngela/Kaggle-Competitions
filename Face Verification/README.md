@@ -1,9 +1,7 @@
 ### TUGraz-TUT Face Verification Challenge
 
 #### Overview
-
-This repository contains Python implementation for the Kaggle competition "TUGraz-TUT Face Verification Challenge". For more details of this competition, please check https://inclass.kaggle.com/c/face-verification2.
+This directory contains Python implementation for the Kaggle competition [TUGraz-TUT Face Verification Challenge](https://inclass.kaggle.com/c/face-verification2).
 
 #### Notes
-* This repository is under active development. Additional code will be uploaded when ready.
-* The code in the subfolder **Extra** might be a little bit messy. Most of them are used to generate figures for the thesis.
+* My Master's Thesis [Competitions in Education: Case Study on Face Verification](http://URN.fi/URN:NBN:fi:tty-201604203830) summarizes the outcome of the competition.
