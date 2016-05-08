@@ -1,2 +1,4 @@
-# Kaggle Competitions
-This repository contains implementations for several Kaggle competitions.
+### Kaggle Competitions
+
+#### Overview
+This repository contains implementations for Kaggle competitions.
