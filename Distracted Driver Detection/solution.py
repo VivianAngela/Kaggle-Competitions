@@ -3,6 +3,7 @@ import glob
 import pyprind
 import numpy as np
 import pandas as pd
+from enum import IntEnum
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
 from keras.layers.core import Flatten, Dense, Dropout
@@ -19,7 +20,17 @@ VALIDATION_NUM_ONE_WHOLE_EPOCH = 5
 PATIENCE_NUM_WHOLE_EPOCHS = 3
 TRAINING_BATCH_SIZE = 16
 TESTING_BATCH_SIZE = 64
+
 USE_CENTER_CROP = False
+WHOLE_IMAGE_SIZE = 256
+SELECTED_IMAGE_SIZE = 224
+class SELECTION_STRATEGIES(IntEnum):
+    TOP_LEFT = 1
+    TOP_RIGHT = 2
+    BOTTOM_LEFT = 3
+    BOTTOM_RIGHT = 4
+    CENTER = 5
+    RANDOM = 6
 
 VANILLA_WEIGHTS_PATH = "/external/Pretrained Models/Keras/VGG19/vgg19_weights.h5"
 INPUT_FOLDER_PATH = "/external/Data/Distracted Driver Detection"
@@ -59,7 +70,7 @@ def preprocess_labels(labels, encoder=None, categorical=True):
         categorical_labels = np_utils.to_categorical(categorical_labels)
     return categorical_labels, encoder
 
-def preprocess_image(image_path):
+def preprocess_image(image_path, selection_strategy):
     if not os.path.isfile(image_path):
         return None
 
@@ -74,7 +85,31 @@ def preprocess_image(image_path):
         half_range_len = min(central_pixel_coordinates)
         image = image[central_pixel_coordinates[0] - half_range_len:central_pixel_coordinates[0] + half_range_len,
                       central_pixel_coordinates[1] - half_range_len:central_pixel_coordinates[1] + half_range_len, :]
-    image = resize(image, (224, 224), preserve_range=True)
+    image = resize(image, (WHOLE_IMAGE_SIZE, WHOLE_IMAGE_SIZE), preserve_range=True)
+
+    # Data augmentation
+    valid_start_index = np.arange(WHOLE_IMAGE_SIZE - SELECTED_IMAGE_SIZE + 1)
+    if selection_strategy == SELECTION_STRATEGIES.TOP_LEFT:
+        row_start_index = valid_start_index[0]
+        column_start_index = valid_start_index[0]
+    elif selection_strategy == SELECTION_STRATEGIES.TOP_RIGHT:
+        row_start_index = valid_start_index[0]
+        column_start_index = valid_start_index[-1]
+    if selection_strategy == SELECTION_STRATEGIES.BOTTOM_LEFT:
+        row_start_index = valid_start_index[-1]
+        column_start_index = valid_start_index[0]
+    elif selection_strategy == SELECTION_STRATEGIES.BOTTOM_RIGHT:
+        row_start_index = valid_start_index[-1]
+        column_start_index = valid_start_index[-1]
+    elif selection_strategy == SELECTION_STRATEGIES.CENTER:
+        row_start_index = np.median(valid_start_index).astype(np.int)
+        column_start_index = np.median(valid_start_index).astype(np.int)
+    else:
+        row_start_index, column_start_index = np.random.randint(valid_start_index[0],
+                                                                valid_start_index[-1] + 1,
+                                                                size=2)
+    image = image[row_start_index:row_start_index + SELECTED_IMAGE_SIZE,
+                  column_start_index:column_start_index + SELECTED_IMAGE_SIZE, :]
 
     # Convert to BGR color space and subtract the mean pixel
     image = image[:, :, ::-1]
@@ -86,8 +121,9 @@ def preprocess_image(image_path):
     image = image.transpose((2, 0, 1))
     return image.astype("float32")
 
-def data_generator(image_path_array, additional_info_array, infinity_loop=True, batch_size=32):
-    def _data_generator(image_path_array, additional_info_array, infinity_loop):
+def data_generator(image_path_array, additional_info_array,
+                   infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.RANDOM, batch_size=32):
+    def _data_generator(image_path_array, additional_info_array, infinity_loop, selection_strategy):
         assert len(image_path_array) == len(additional_info_array)
 
         seed = 0
@@ -96,7 +132,7 @@ def data_generator(image_path_array, additional_info_array, infinity_loop=True, 
             for entry_index in np.random.permutation(len(image_path_array)):
                 image_path = image_path_array[entry_index]
                 additional_info = additional_info_array[entry_index]
-                image = preprocess_image(image_path)
+                image = preprocess_image(image_path, selection_strategy)
                 if image is not None:
                     yield (image, additional_info)
             seed += 1
@@ -106,7 +142,7 @@ def data_generator(image_path_array, additional_info_array, infinity_loop=True, 
 
     image_list = []
     additional_info_list = []
-    for image, additional_info in _data_generator(image_path_array, additional_info_array, infinity_loop):
+    for image, additional_info in _data_generator(image_path_array, additional_info_array, infinity_loop, selection_strategy):
         if len(image_list) < batch_size:
             image_list.append(image)
             additional_info_list.append(additional_info)
@@ -198,19 +234,10 @@ def init_model():
     return model
 
 def generate_prediction(selected_fold_index):
-    # Create folders when necessary
     for folder_path in [MODEL_FOLDER_PATH, SUBMISSION_FOLDER_PATH]:
         if not os.path.isdir(folder_path):
             print("Creating folder {:s} ...".format(folder_path))
             os.makedirs(folder_path)
-
-    optimal_weights_path = os.path.join(MODEL_FOLDER_PATH, "{:s}_{:s}_{:d}.h5".format(
-                                            MODEL_PREFIX, str(USE_CENTER_CROP), selected_fold_index))
-    submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "{:s}_{:s}_{:d}.csv".format(
-                                            SUBMISSION_PREFIX, str(USE_CENTER_CROP), selected_fold_index))
-    if os.path.isfile(submission_file_path):
-        print("{:s} already exists!".format(submission_file_path))
-        return
 
     print("Splitting the training data set by using selected_fold_index {:d} ...".format(selected_fold_index))
     train_image_path_array, train_label_array, validate_image_path_array, validate_label_array = split_training_data_set(selected_fold_index)
@@ -222,13 +249,15 @@ def generate_prediction(selected_fold_index):
     print("Initiating model ...")
     model = init_model()
 
+    optimal_weights_path = os.path.join(MODEL_FOLDER_PATH, "{:s}_{:s}_{:d}.h5".format(
+                                            MODEL_PREFIX, str(USE_CENTER_CROP), selected_fold_index))
     if not os.path.isfile(optimal_weights_path):
         print("Performing the training procedure ...")
         earlystopping_callback = EarlyStopping(monitor="val_loss", patience=int(VALIDATION_NUM_ONE_WHOLE_EPOCH * PATIENCE_NUM_WHOLE_EPOCHS))
         modelcheckpoint_callback = ModelCheckpoint(optimal_weights_path, monitor="val_loss", save_best_only=True)
-        model.fit_generator(data_generator(train_image_path_array, categorical_train_label_array, infinity_loop=True, batch_size=TRAINING_BATCH_SIZE),
+        model.fit_generator(data_generator(train_image_path_array, categorical_train_label_array, infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.RANDOM, batch_size=TRAINING_BATCH_SIZE),
                             samples_per_epoch=int(len(train_image_path_array) / VALIDATION_NUM_ONE_WHOLE_EPOCH / TRAINING_BATCH_SIZE) * TRAINING_BATCH_SIZE,
-                            validation_data=data_generator(validate_image_path_array, categorical_validate_label_array, infinity_loop=True, batch_size=TESTING_BATCH_SIZE),
+                            validation_data=data_generator(validate_image_path_array, categorical_validate_label_array, infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.CENTER, batch_size=TESTING_BATCH_SIZE),
                             nb_val_samples=len(validate_image_path_array),
                             callbacks=[earlystopping_callback, modelcheckpoint_callback],
                             nb_epoch=1000000, verbose=2)
@@ -237,22 +266,33 @@ def generate_prediction(selected_fold_index):
     assert os.path.isfile(optimal_weights_path)
     model.load_weights(optimal_weights_path)
 
-    # Generate the submission file
-    submission_file_content = pd.read_csv(SAMPLE_SUBMISSION_FILE_PATH)
-    test_image_name_array = submission_file_content["img"].as_matrix()
-    test_image_path_list = [os.path.join(TESTING_FOLDER_PATH, test_image_name) for test_image_name in test_image_name_array]
-    test_image_index_list = range(len(test_image_path_list))
+    for selection_strategy in [SELECTION_STRATEGIES.TOP_LEFT, SELECTION_STRATEGIES.TOP_RIGHT, SELECTION_STRATEGIES.BOTTOM_LEFT, SELECTION_STRATEGIES.BOTTOM_RIGHT, SELECTION_STRATEGIES.CENTER]:
+        print("Generating prediction for selection_strategy {:d} ...".format(selection_strategy))
 
-    progress_bar = pyprind.ProgBar(np.ceil(len(test_image_path_list) / TESTING_BATCH_SIZE))
-    for image_array, index_array in data_generator(test_image_path_list, test_image_index_list,
-                                                   infinity_loop=False, batch_size=TESTING_BATCH_SIZE):
-        proba = model.predict_proba(image_array, batch_size=TESTING_BATCH_SIZE, verbose=0)
-        submission_file_content.loc[index_array, encoder.classes_] = proba
-        progress_bar.update()
-    print(progress_bar)
+        submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "{:s}_{:s}_{:d}_{:d}_{:d}.csv".format(
+                                                SUBMISSION_PREFIX, str(USE_CENTER_CROP), selected_fold_index, selection_strategy))
+        if os.path.isfile(submission_file_path):
+            print("{:s} already exists!".format(submission_file_path))
+            continue
 
-    print("Writing submission to disk ...")
-    submission_file_content.to_csv(submission_file_path, index=False)
+        # Generate the submission file
+        submission_file_content = pd.read_csv(SAMPLE_SUBMISSION_FILE_PATH)
+        test_image_name_array = submission_file_content["img"].as_matrix()
+        test_image_path_list = [os.path.join(TESTING_FOLDER_PATH, test_image_name) for test_image_name in test_image_name_array]
+        test_image_index_list = range(len(test_image_path_list))
+
+        progress_bar = pyprind.ProgBar(np.ceil(len(test_image_path_list) / TESTING_BATCH_SIZE))
+        for image_array, index_array in data_generator(test_image_path_list, test_image_index_list,
+                                                       infinity_loop=False,
+                                                       selection_strategy=selection_strategy,
+                                                       batch_size=TESTING_BATCH_SIZE):
+            proba = model.predict_proba(image_array, batch_size=TESTING_BATCH_SIZE, verbose=0)
+            submission_file_content.loc[index_array, encoder.classes_] = proba
+            progress_bar.update()
+        print(progress_bar)
+
+        print("Writing submission to disk ...")
+        submission_file_content.to_csv(submission_file_path, index=False)
 
 def ensemble_predictions():
     def _ensemble_predictions(ensemble_func, ensemble_submission_file_name):
