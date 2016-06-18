@@ -15,12 +15,10 @@ from skimage.transform import resize
 from sklearn.cross_validation import LabelKFold
 from sklearn.preprocessing import LabelEncoder
 
+# Cross Validation
 FOLD_NUM = 8
-VALIDATION_NUM_ONE_WHOLE_EPOCH = 5
-PATIENCE_NUM_WHOLE_EPOCHS = 3
-TRAINING_BATCH_SIZE = 16
-TESTING_BATCH_SIZE = 64
 
+# Image Processing
 USE_CENTER_CROP = False
 WHOLE_IMAGE_SIZE = 256
 SELECTED_IMAGE_SIZE = 224
@@ -32,6 +30,13 @@ class SELECTION_STRATEGIES(IntEnum):
     CENTER = 5
     RANDOM = 6
 
+# Training Phase
+VALIDATION_NUM_ONE_WHOLE_EPOCH = 4
+PATIENCE_NUM_WHOLE_EPOCHS = 3
+TRAINING_BATCH_SIZE = 16
+TESTING_BATCH_SIZE = 64
+
+# Data Set
 VANILLA_WEIGHTS_PATH = "/external/Pretrained Models/Keras/VGG19/vgg19_weights.h5"
 INPUT_FOLDER_PATH = "/external/Data/Distracted Driver Detection"
 TRAINING_FOLDER_PATH = os.path.join(INPUT_FOLDER_PATH, "train")
@@ -95,7 +100,7 @@ def preprocess_image(image_path, selection_strategy):
     elif selection_strategy == SELECTION_STRATEGIES.TOP_RIGHT:
         row_start_index = valid_start_index[0]
         column_start_index = valid_start_index[-1]
-    if selection_strategy == SELECTION_STRATEGIES.BOTTOM_LEFT:
+    elif selection_strategy == SELECTION_STRATEGIES.BOTTOM_LEFT:
         row_start_index = valid_start_index[-1]
         column_start_index = valid_start_index[0]
     elif selection_strategy == SELECTION_STRATEGIES.BOTTOM_RIGHT:
@@ -142,7 +147,8 @@ def data_generator(image_path_array, additional_info_array,
 
     image_list = []
     additional_info_list = []
-    for image, additional_info in _data_generator(image_path_array, additional_info_array, infinity_loop, selection_strategy):
+    for image, additional_info in _data_generator(image_path_array, additional_info_array,
+                                                  infinity_loop, selection_strategy):
         if len(image_list) < batch_size:
             image_list.append(image)
             additional_info_list.append(additional_info)
@@ -250,14 +256,16 @@ def generate_prediction(selected_fold_index):
     model = init_model()
 
     optimal_weights_path = os.path.join(MODEL_FOLDER_PATH, "{:s}_{:s}_{:d}.h5".format(
-                                            MODEL_PREFIX, str(USE_CENTER_CROP), selected_fold_index))
+        MODEL_PREFIX, str(USE_CENTER_CROP), selected_fold_index))
     if not os.path.isfile(optimal_weights_path):
         print("Performing the training procedure ...")
         earlystopping_callback = EarlyStopping(monitor="val_loss", patience=int(VALIDATION_NUM_ONE_WHOLE_EPOCH * PATIENCE_NUM_WHOLE_EPOCHS))
         modelcheckpoint_callback = ModelCheckpoint(optimal_weights_path, monitor="val_loss", save_best_only=True)
-        model.fit_generator(data_generator(train_image_path_array, categorical_train_label_array, infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.RANDOM, batch_size=TRAINING_BATCH_SIZE),
+        model.fit_generator(data_generator(train_image_path_array, categorical_train_label_array,
+                                           infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.RANDOM, batch_size=TRAINING_BATCH_SIZE),
                             samples_per_epoch=int(len(train_image_path_array) / VALIDATION_NUM_ONE_WHOLE_EPOCH / TRAINING_BATCH_SIZE) * TRAINING_BATCH_SIZE,
-                            validation_data=data_generator(validate_image_path_array, categorical_validate_label_array, infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.CENTER, batch_size=TESTING_BATCH_SIZE),
+                            validation_data=data_generator(validate_image_path_array, categorical_validate_label_array,
+                                                           infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.CENTER, batch_size=TESTING_BATCH_SIZE),
                             nb_val_samples=len(validate_image_path_array),
                             callbacks=[earlystopping_callback, modelcheckpoint_callback],
                             nb_epoch=1000000, verbose=2)
@@ -266,11 +274,13 @@ def generate_prediction(selected_fold_index):
     assert os.path.isfile(optimal_weights_path)
     model.load_weights(optimal_weights_path)
 
-    for selection_strategy in [SELECTION_STRATEGIES.TOP_LEFT, SELECTION_STRATEGIES.TOP_RIGHT, SELECTION_STRATEGIES.BOTTOM_LEFT, SELECTION_STRATEGIES.BOTTOM_RIGHT, SELECTION_STRATEGIES.CENTER]:
-        print("Generating prediction for selection_strategy {:d} ...".format(selection_strategy))
+    for selection_strategy in [SELECTION_STRATEGIES.TOP_LEFT, SELECTION_STRATEGIES.TOP_RIGHT,
+                               SELECTION_STRATEGIES.BOTTOM_LEFT, SELECTION_STRATEGIES.BOTTOM_RIGHT,
+                               SELECTION_STRATEGIES.CENTER]:
+        print("Generating prediction for patch {:s} ...".format(selection_strategy.name))
 
-        submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "{:s}_{:s}_{:d}_{:d}_{:d}.csv".format(
-                                                SUBMISSION_PREFIX, str(USE_CENTER_CROP), selected_fold_index, selection_strategy))
+        submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "{:s}_{:s}_{:d}_{:s}.csv".format(
+            SUBMISSION_PREFIX, str(USE_CENTER_CROP), selected_fold_index, selection_strategy.name))
         if os.path.isfile(submission_file_path):
             print("{:s} already exists!".format(submission_file_path))
             continue
