@@ -37,7 +37,7 @@ TRAINING_BATCH_SIZE = 16
 TESTING_BATCH_SIZE = 64
 
 # Data Set
-VANILLA_WEIGHTS_PATH = "/external/Pretrained Models/Keras/VGG19/vgg19_weights.h5"
+VANILLA_WEIGHTS_PATH = "/external/Pretrained Models/Keras/VGG16/vgg16_weights.h5"
 INPUT_FOLDER_PATH = "/external/Data/Distracted Driver Detection"
 TRAINING_FOLDER_PATH = os.path.join(INPUT_FOLDER_PATH, "train")
 TESTING_FOLDER_PATH = os.path.join(INPUT_FOLDER_PATH, "test")
@@ -180,7 +180,7 @@ def init_model():
             model.outputs = [model.layers[-1].output]
         model.built = False
 
-    # Initiate a vanilla VGG19 model
+    # Initiate a vanilla VGG16 model
     model = Sequential()
     model.add(ZeroPadding2D((1, 1), input_shape=(3, 224, 224)))
     model.add(Convolution2D(64, 3, 3, activation="relu"))
@@ -198,8 +198,6 @@ def init_model():
     model.add(Convolution2D(256, 3, 3, activation="relu"))
     model.add(ZeroPadding2D((1, 1)))
     model.add(Convolution2D(256, 3, 3, activation="relu"))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(256, 3, 3, activation="relu"))
     model.add(MaxPooling2D((2, 2), strides=(2, 2)))
     model.add(ZeroPadding2D((1, 1)))
     model.add(Convolution2D(512, 3, 3, activation="relu"))
@@ -207,11 +205,7 @@ def init_model():
     model.add(Convolution2D(512, 3, 3, activation="relu"))
     model.add(ZeroPadding2D((1, 1)))
     model.add(Convolution2D(512, 3, 3, activation="relu"))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(512, 3, 3, activation="relu"))
     model.add(MaxPooling2D((2, 2), strides=(2, 2)))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(512, 3, 3, activation="relu"))
     model.add(ZeroPadding2D((1, 1)))
     model.add(Convolution2D(512, 3, 3, activation="relu"))
     model.add(ZeroPadding2D((1, 1)))
