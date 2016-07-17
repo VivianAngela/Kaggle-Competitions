@@ -1,5 +1,6 @@
 import os
 import glob
+import h5py
 import pyprind
 import numpy as np
 import pandas as pd
@@ -19,7 +20,6 @@ from sklearn.preprocessing import LabelEncoder
 FOLD_NUM = 8
 
 # Image Processing
-USE_CENTER_CROP = False
 WHOLE_IMAGE_SIZE = 256
 SELECTED_IMAGE_SIZE = 224
 class SELECTION_STRATEGIES(IntEnum):
@@ -30,11 +30,12 @@ class SELECTION_STRATEGIES(IntEnum):
     CENTER = 5
     RANDOM = 6
 
-# Training Phase
-VALIDATION_NUM_ONE_WHOLE_EPOCH = 4
-PATIENCE_NUM_WHOLE_EPOCHS = 3
-TRAINING_BATCH_SIZE = 16
+# Training/Testing Procedure
+PATIENCE = 3
+TRAINING_BATCH_SIZE = 64
 TESTING_BATCH_SIZE = 64
+FIRST_INITIAL_LEARNING_RATE = 0.0005
+SECOND_INITIAL_LEARNING_RATE = 0.0001
 
 # Data Set
 VANILLA_WEIGHTS_PATH = "/external/Pretrained Models/Keras/VGG16/vgg16_weights.h5"
@@ -45,7 +46,8 @@ DRIVER_FILE_PATH = os.path.join(INPUT_FOLDER_PATH, "driver_imgs_list.csv")
 SAMPLE_SUBMISSION_FILE_PATH = os.path.join(INPUT_FOLDER_PATH, "sample_submission.csv")
 MODEL_FOLDER_PATH = os.path.join(INPUT_FOLDER_PATH, "models")
 SUBMISSION_FOLDER_PATH = os.path.join(INPUT_FOLDER_PATH, "submissions")
-MODEL_PREFIX = "Optimal_Weights"
+FIRST_MODEL_PREFIX = "Optimal_Weights_1"
+SECOND_MODEL_PREFIX = "Optimal_Weights_2"
 SUBMISSION_PREFIX = "Aurora"
 
 def split_training_data_set(selected_fold_index):
@@ -84,12 +86,7 @@ def preprocess_image(image_path, selection_strategy):
     if np.mean(image) == 0:
         return None
 
-    # Take center crop of the image and resize it
-    if USE_CENTER_CROP:
-        central_pixel_coordinates = (np.array(image.shape[0:2]) / 2).astype(np.int)
-        half_range_len = min(central_pixel_coordinates)
-        image = image[central_pixel_coordinates[0] - half_range_len:central_pixel_coordinates[0] + half_range_len,
-                      central_pixel_coordinates[1] - half_range_len:central_pixel_coordinates[1] + half_range_len, :]
+    # Resize image
     image = resize(image, (WHOLE_IMAGE_SIZE, WHOLE_IMAGE_SIZE), preserve_range=True)
 
     # Data augmentation
@@ -162,27 +159,9 @@ def data_generator(image_path_array, additional_info_array,
         yield (np.array(image_list), np.array(additional_info_list))
 
 def init_model():
-    def _pop_layer(model):
-        """
-        Reference: https://github.com/fchollet/keras/issues/2640
-        """
-
-        if not model.outputs:
-            raise Exception("Sequential model cannot be popped: model is empty.")
-
-        model.layers.pop()
-        if not model.layers:
-            model.outputs = []
-            model.inbound_nodes = []
-            model.outbound_nodes = []
-        else:
-            model.layers[-1].outbound_nodes = []
-            model.outputs = [model.layers[-1].output]
-        model.built = False
-
-    # Initiate a vanilla VGG16 model
+    # Initiate the convolutional layers
     model = Sequential()
-    model.add(ZeroPadding2D((1, 1), input_shape=(3, 224, 224)))
+    model.add(ZeroPadding2D((1, 1), input_shape=(3, SELECTED_IMAGE_SIZE, SELECTED_IMAGE_SIZE)))
     model.add(Convolution2D(64, 3, 3, activation="relu"))
     model.add(ZeroPadding2D((1, 1)))
     model.add(Convolution2D(64, 3, 3, activation="relu"))
@@ -213,23 +192,28 @@ def init_model():
     model.add(ZeroPadding2D((1, 1)))
     model.add(Convolution2D(512, 3, 3, activation="relu"))
     model.add(MaxPooling2D((2, 2), strides=(2, 2)))
+
+    # Load vanilla weights of the convolutional layers
+    assert os.path.isfile(VANILLA_WEIGHTS_PATH), "Vanilla weights {:s} does not exist!".format(VANILLA_WEIGHTS_PATH)
+    with h5py.File(VANILLA_WEIGHTS_PATH) as weights_file:
+        for layer_index in range(weights_file.attrs["nb_layers"]):
+            if layer_index >= len(model.layers):
+                break
+
+            layer_info = weights_file["layer_{}".format(layer_index)]
+            layer_weights = [layer_info["param_{}".format(param_index)] for param_index in range(layer_info.attrs["nb_params"])]
+            model.layers[layer_index].set_weights(layer_weights)
+
+    # Initiate the customized fully-connected layers
     model.add(Flatten())
-    model.add(Dense(4096, activation="relu"))
+    model.add(Dense(256, activation="relu"))
     model.add(Dropout(0.5))
-    model.add(Dense(4096, activation="relu"))
+    model.add(Dense(256, activation="relu"))
     model.add(Dropout(0.5))
-    model.add(Dense(1000, activation="softmax"))
-
-    # Load vanilla weights
-    if os.path.isfile(VANILLA_WEIGHTS_PATH):
-        model.load_weights(VANILLA_WEIGHTS_PATH)
-
-    # Customize the neural network structure
-    _pop_layer(model)
     model.add(Dense(10, activation="softmax"))
 
     # Compile the neural network
-    optimizer = SGD(lr=0.001, decay=0.005, momentum=0.9, nesterov=True)
+    optimizer = SGD(lr=0.01, decay=0.005, momentum=0.9, nesterov=True)
     model.compile(optimizer=optimizer, loss="categorical_crossentropy", metrics=["accuracy"])
     return model
 
@@ -249,32 +233,75 @@ def generate_prediction(selected_fold_index):
     print("Initiating model ...")
     model = init_model()
 
-    optimal_weights_path = os.path.join(MODEL_FOLDER_PATH, "{:s}_{:s}_{:d}.h5".format(
-        MODEL_PREFIX, str(USE_CENTER_CROP), selected_fold_index))
-    if not os.path.isfile(optimal_weights_path):
-        print("Performing the training procedure ...")
-        earlystopping_callback = EarlyStopping(monitor="val_loss", patience=int(VALIDATION_NUM_ONE_WHOLE_EPOCH * PATIENCE_NUM_WHOLE_EPOCHS))
-        modelcheckpoint_callback = ModelCheckpoint(optimal_weights_path, monitor="val_loss", save_best_only=True)
+    # The first training procedure
+    first_optimal_weights_path = os.path.join(MODEL_FOLDER_PATH, "{:s}_{:d}.h5".format(
+        FIRST_MODEL_PREFIX, selected_fold_index))
+    if not os.path.isfile(first_optimal_weights_path):
+        print("Freezing all convolutional blocks ...")
+        for layer in model.layers[:-6]:
+            layer.trainable = False
+
+        print("The trainable properties of all layers are as follows:")
+        for layer in model.layers:
+            print(type(layer), layer.trainable)
+
+        print("Setting learning rate to {:5f} ...".format(FIRST_INITIAL_LEARNING_RATE))
+        model.optimizer.lr.set_value(FIRST_INITIAL_LEARNING_RATE)
+        print(model.optimizer.lr.get_value())
+
+        print("Performing the first training procedure ...")
+        modelcheckpoint_callback = ModelCheckpoint(first_optimal_weights_path, monitor="val_loss", save_best_only=True)
         model.fit_generator(data_generator(train_image_path_array, categorical_train_label_array,
                                            infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.RANDOM, batch_size=TRAINING_BATCH_SIZE),
-                            samples_per_epoch=int(len(train_image_path_array) / VALIDATION_NUM_ONE_WHOLE_EPOCH / TRAINING_BATCH_SIZE) * TRAINING_BATCH_SIZE,
+                            samples_per_epoch=int(len(train_image_path_array) / TRAINING_BATCH_SIZE) * TRAINING_BATCH_SIZE,
+                            validation_data=data_generator(validate_image_path_array, categorical_validate_label_array,
+                                                           infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.CENTER, batch_size=TESTING_BATCH_SIZE),
+                            nb_val_samples=len(validate_image_path_array),
+                            callbacks=[modelcheckpoint_callback],
+                            nb_epoch=3, verbose=2)
+    assert os.path.isfile(first_optimal_weights_path)
+    model.load_weights(first_optimal_weights_path)
+
+    # The second training procedure
+    second_optimal_weights_path = os.path.join(MODEL_FOLDER_PATH, "{:s}_{:d}.h5".format(
+        SECOND_MODEL_PREFIX, selected_fold_index))
+    if not os.path.isfile(second_optimal_weights_path):
+        print("Freezing all convolutional blocks except the last one ...")
+        for layer in model.layers[:-13]:
+            layer.trainable = False
+        for layer in model.layers[-13:-6]:
+            layer.trainable = True
+
+        print("The trainable properties of all layers are as follows:")
+        for layer in model.layers:
+            print(type(layer), layer.trainable)
+
+        print("Setting learning rate to {:5f} ...".format(SECOND_INITIAL_LEARNING_RATE))
+        model.optimizer.lr.set_value(SECOND_INITIAL_LEARNING_RATE)
+        print(model.optimizer.lr.get_value())
+
+        print("Performing the second training procedure ...")
+        earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
+        modelcheckpoint_callback = ModelCheckpoint(second_optimal_weights_path, monitor="val_loss", save_best_only=True)
+        model.fit_generator(data_generator(train_image_path_array, categorical_train_label_array,
+                                           infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.RANDOM, batch_size=TRAINING_BATCH_SIZE),
+                            samples_per_epoch=int(len(train_image_path_array) / TRAINING_BATCH_SIZE) * TRAINING_BATCH_SIZE,
                             validation_data=data_generator(validate_image_path_array, categorical_validate_label_array,
                                                            infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.CENTER, batch_size=TESTING_BATCH_SIZE),
                             nb_val_samples=len(validate_image_path_array),
                             callbacks=[earlystopping_callback, modelcheckpoint_callback],
                             nb_epoch=1000000, verbose=2)
+    assert os.path.isfile(second_optimal_weights_path)
+    model.load_weights(second_optimal_weights_path)
 
     print("Performing the testing procedure ...")
-    assert os.path.isfile(optimal_weights_path)
-    model.load_weights(optimal_weights_path)
-
     for selection_strategy in [SELECTION_STRATEGIES.TOP_LEFT, SELECTION_STRATEGIES.TOP_RIGHT,
                                SELECTION_STRATEGIES.BOTTOM_LEFT, SELECTION_STRATEGIES.BOTTOM_RIGHT,
                                SELECTION_STRATEGIES.CENTER]:
         print("Generating prediction for patch {:s} ...".format(selection_strategy.name))
 
-        submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "{:s}_{:s}_{:d}_{:s}.csv".format(
-            SUBMISSION_PREFIX, str(USE_CENTER_CROP), selected_fold_index, selection_strategy.name))
+        submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "{:s}_{:d}_{:s}.csv".format(
+            SUBMISSION_PREFIX, selected_fold_index, selection_strategy.name))
         if os.path.isfile(submission_file_path):
             print("{:s} already exists!".format(submission_file_path))
             continue
