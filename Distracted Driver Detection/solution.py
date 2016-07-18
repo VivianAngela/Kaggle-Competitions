@@ -5,7 +5,7 @@ import pyprind
 import numpy as np
 import pandas as pd
 from enum import IntEnum
-from keras.callbacks import EarlyStopping, ModelCheckpoint
+from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
 from keras.layers.core import Flatten, Dense, Dropout
 from keras.models import Sequential
@@ -219,6 +219,17 @@ def init_model():
     model.compile(optimizer=optimizer, loss="categorical_crossentropy", metrics=["accuracy"])
     return model
 
+class LearningRateInspector(Callback):
+    """
+        Inspect the learning rate at the beginning of each epoch.
+    """
+    def __init__(self):
+        super(LearningRateInspector, self).__init__()
+
+    def on_epoch_begin(self, epoch, logs={}):
+        current_learning_rate = self.model.optimizer.lr.get_value()
+        print("Current learning rate is {:5f}.".format(current_learning_rate))
+
 def generate_prediction(selected_fold_index):
     for folder_path in [MODEL_FOLDER_PATH, SUBMISSION_FOLDER_PATH]:
         if not os.path.isdir(folder_path):
@@ -249,9 +260,9 @@ def generate_prediction(selected_fold_index):
 
         print("Setting learning rate to {:5f} ...".format(FIRST_INITIAL_LEARNING_RATE))
         model.optimizer.lr.set_value(FIRST_INITIAL_LEARNING_RATE)
-        print(model.optimizer.lr.get_value())
 
         print("Performing the first training procedure ...")
+        learningrateinspector_callback = LearningRateInspector()
         earlystopping_callback = EarlyStopping(monitor="val_loss", patience=FIRST_PATIENCE)
         modelcheckpoint_callback = ModelCheckpoint(first_model_weights_path, monitor="val_loss", save_best_only=True)
         model.fit_generator(data_generator(train_image_path_array, categorical_train_label_array,
@@ -260,7 +271,7 @@ def generate_prediction(selected_fold_index):
                             validation_data=data_generator(validate_image_path_array, categorical_validate_label_array,
                                                            infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.CENTER, batch_size=TESTING_BATCH_SIZE),
                             nb_val_samples=len(validate_image_path_array),
-                            callbacks=[earlystopping_callback, modelcheckpoint_callback],
+                            callbacks=[learningrateinspector_callback, earlystopping_callback, modelcheckpoint_callback],
                             nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
     assert os.path.isfile(first_model_weights_path)
     model.load_weights(first_model_weights_path)
@@ -281,9 +292,9 @@ def generate_prediction(selected_fold_index):
 
         print("Setting learning rate to {:5f} ...".format(SECOND_INITIAL_LEARNING_RATE))
         model.optimizer.lr.set_value(SECOND_INITIAL_LEARNING_RATE)
-        print(model.optimizer.lr.get_value())
 
         print("Performing the second training procedure ...")
+        learningrateinspector_callback = LearningRateInspector()
         earlystopping_callback = EarlyStopping(monitor="val_loss", patience=SECOND_PATIENCE)
         modelcheckpoint_callback = ModelCheckpoint(second_model_weights_path, monitor="val_loss", save_best_only=True)
         model.fit_generator(data_generator(train_image_path_array, categorical_train_label_array,
@@ -292,7 +303,7 @@ def generate_prediction(selected_fold_index):
                             validation_data=data_generator(validate_image_path_array, categorical_validate_label_array,
                                                            infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.CENTER, batch_size=TESTING_BATCH_SIZE),
                             nb_val_samples=len(validate_image_path_array),
-                            callbacks=[earlystopping_callback, modelcheckpoint_callback],
+                            callbacks=[learningrateinspector_callback, earlystopping_callback, modelcheckpoint_callback],
                             nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
     assert os.path.isfile(second_model_weights_path)
     model.load_weights(second_model_weights_path)
