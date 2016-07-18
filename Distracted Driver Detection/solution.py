@@ -64,8 +64,8 @@ def split_training_data_set(selected_fold_index):
     cv_object = LabelKFold(subject_array, n_folds=FOLD_NUM)
     for fold_index, (train_indexes, validate_indexes) in enumerate(cv_object):
         if fold_index == selected_fold_index:
-            print("Choosing subjects {:s} as the validation data set.".format(str(np.unique(subject_array[validate_indexes]))))
-            print("The training and validation data sets contain {:d} and {:d} images, respectively.".format(len(train_indexes), len(validate_indexes)))
+            print("Choosing subjects {} as the validation data set.".format(str(np.unique(subject_array[validate_indexes]))))
+            print("The training and validation data sets contain {} and {} images, respectively.".format(len(train_indexes), len(validate_indexes)))
             return image_path_array[train_indexes], label_array[train_indexes], \
                 image_path_array[validate_indexes], label_array[validate_indexes]
 
@@ -196,7 +196,7 @@ def init_model():
     model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
     # Load vanilla weights of the convolutional layers
-    assert os.path.isfile(VANILLA_WEIGHTS_PATH), "Vanilla weights {:s} does not exist!".format(VANILLA_WEIGHTS_PATH)
+    assert os.path.isfile(VANILLA_WEIGHTS_PATH), "Vanilla weights {} does not exist!".format(VANILLA_WEIGHTS_PATH)
     with h5py.File(VANILLA_WEIGHTS_PATH) as weights_file:
         for layer_index in range(weights_file.attrs["nb_layers"]):
             if layer_index >= len(model.layers):
@@ -216,7 +216,7 @@ def init_model():
     model.add(Dense(10, activation="softmax"))
 
     # Compile the neural network
-    optimizer = SGD(lr=0.01, decay=0.005, momentum=0.9, nesterov=True)
+    optimizer = SGD(lr=0.01, momentum=0.9, nesterov=True)
     model.compile(optimizer=optimizer, loss="categorical_crossentropy", metrics=["accuracy"])
     return model
 
@@ -229,15 +229,15 @@ class LearningRateInspector(Callback):
 
     def on_epoch_begin(self, epoch, logs={}):
         current_learning_rate = self.model.optimizer.lr.get_value()
-        print("Current learning rate is {:5f}.".format(current_learning_rate))
+        print("Current learning rate is {}.".format(current_learning_rate))
 
 def generate_prediction(selected_fold_index):
     for folder_path in [MODEL_FOLDER_PATH, SUBMISSION_FOLDER_PATH]:
         if not os.path.isdir(folder_path):
-            print("Creating folder {:s} ...".format(folder_path))
+            print("Creating folder {} ...".format(folder_path))
             os.makedirs(folder_path)
 
-    print("Splitting the training data set by using selected_fold_index {:d} ...".format(selected_fold_index))
+    print("Splitting the training data set by using selected_fold_index {} ...".format(selected_fold_index))
     train_image_path_array, train_label_array, \
     validate_image_path_array, validate_label_array = split_training_data_set(selected_fold_index)
 
@@ -249,7 +249,7 @@ def generate_prediction(selected_fold_index):
     model = init_model()
 
     # The first training procedure
-    first_model_weights_path = os.path.join(MODEL_FOLDER_PATH, "{:s}_{:d}.h5".format(
+    first_model_weights_path = os.path.join(MODEL_FOLDER_PATH, "{}_{}.h5".format(
         FIRST_MODEL_WEIGHTS_PREFIX, selected_fold_index))
     if not os.path.isfile(first_model_weights_path):
         print("Freezing all convolutional blocks ...")
@@ -260,7 +260,7 @@ def generate_prediction(selected_fold_index):
         for layer in model.layers:
             print(type(layer), layer.trainable)
 
-        print("Setting learning rate to {:5f} ...".format(FIRST_INITIAL_LEARNING_RATE))
+        print("Setting learning rate to {:.5f} ...".format(FIRST_INITIAL_LEARNING_RATE))
         model.optimizer.lr.set_value(FIRST_INITIAL_LEARNING_RATE)
 
         print("Performing the first training procedure ...")
@@ -279,7 +279,7 @@ def generate_prediction(selected_fold_index):
     model.load_weights(first_model_weights_path)
 
     # The second training procedure
-    second_model_weights_path = os.path.join(MODEL_FOLDER_PATH, "{:s}_{:d}.h5".format(
+    second_model_weights_path = os.path.join(MODEL_FOLDER_PATH, "{}_{}.h5".format(
         SECOND_MODEL_WEIGHTS_PREFIX, selected_fold_index))
     if not os.path.isfile(second_model_weights_path):
         print("Freezing all convolutional blocks except the last one ...")
@@ -292,7 +292,7 @@ def generate_prediction(selected_fold_index):
         for layer in model.layers:
             print(type(layer), layer.trainable)
 
-        print("Setting learning rate to {:5f} ...".format(SECOND_INITIAL_LEARNING_RATE))
+        print("Setting learning rate to {:.5f} ...".format(SECOND_INITIAL_LEARNING_RATE))
         model.optimizer.lr.set_value(SECOND_INITIAL_LEARNING_RATE)
 
         print("Performing the second training procedure ...")
@@ -314,12 +314,12 @@ def generate_prediction(selected_fold_index):
     for selection_strategy in [SELECTION_STRATEGIES.TOP_LEFT, SELECTION_STRATEGIES.TOP_RIGHT,
                                SELECTION_STRATEGIES.BOTTOM_LEFT, SELECTION_STRATEGIES.BOTTOM_RIGHT,
                                SELECTION_STRATEGIES.CENTER]:
-        print("Generating prediction for patch {:s} ...".format(selection_strategy.name))
+        print("Generating prediction for patch {} ...".format(selection_strategy.name))
 
-        submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "{:s}_{:d}_{:s}.csv".format(
+        submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "{}_{}_{}.csv".format(
             SUBMISSION_PREFIX, selected_fold_index, selection_strategy.name))
         if os.path.isfile(submission_file_path):
-            print("{:s} already exists!".format(submission_file_path))
+            print("{} already exists!".format(submission_file_path))
             continue
 
         # Generate the submission file
@@ -350,7 +350,7 @@ def ensemble_predictions():
 
     # Read predictions
     submission_file_path_list = glob.glob(os.path.join(SUBMISSION_FOLDER_PATH, SUBMISSION_PREFIX + "*.csv"))
-    print("There are {:d} submissions in total.".format(len(submission_file_path_list)))
+    print("There are {} submissions in total.".format(len(submission_file_path_list)))
     submission_file_content_list = [pd.read_csv(submission_file_path) for submission_file_path in submission_file_path_list]
     ensemble_submission_file_content = submission_file_content_list[0]
 
