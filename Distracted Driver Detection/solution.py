@@ -203,7 +203,8 @@ def init_model():
                 break
 
             layer_info = weights_file["layer_{}".format(layer_index)]
-            layer_weights = [layer_info["param_{}".format(param_index)] for param_index in range(layer_info.attrs["nb_params"])]
+            layer_weights = [layer_info["param_{}".format(param_index)] \
+                             for param_index in range(layer_info.attrs["nb_params"])]
             model.layers[layer_index].set_weights(layer_weights)
 
     # Initiate the customized fully-connected layers
@@ -237,7 +238,8 @@ def generate_prediction(selected_fold_index):
             os.makedirs(folder_path)
 
     print("Splitting the training data set by using selected_fold_index {:d} ...".format(selected_fold_index))
-    train_image_path_array, train_label_array, validate_image_path_array, validate_label_array = split_training_data_set(selected_fold_index)
+    train_image_path_array, train_label_array, \
+    validate_image_path_array, validate_label_array = split_training_data_set(selected_fold_index)
 
     print("Performing conversion ...")
     categorical_train_label_array, encoder = preprocess_labels(train_label_array)
@@ -266,10 +268,10 @@ def generate_prediction(selected_fold_index):
         earlystopping_callback = EarlyStopping(monitor="val_loss", patience=FIRST_PATIENCE)
         modelcheckpoint_callback = ModelCheckpoint(first_model_weights_path, monitor="val_loss", save_best_only=True)
         model.fit_generator(data_generator(train_image_path_array, categorical_train_label_array,
-                                           infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.RANDOM, batch_size=TRAINING_BATCH_SIZE),
+                                infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.RANDOM, batch_size=TRAINING_BATCH_SIZE),
                             samples_per_epoch=int(len(train_image_path_array) / TRAINING_BATCH_SIZE) * TRAINING_BATCH_SIZE,
                             validation_data=data_generator(validate_image_path_array, categorical_validate_label_array,
-                                                           infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.CENTER, batch_size=TESTING_BATCH_SIZE),
+                                infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.CENTER, batch_size=TESTING_BATCH_SIZE),
                             nb_val_samples=len(validate_image_path_array),
                             callbacks=[learningrateinspector_callback, earlystopping_callback, modelcheckpoint_callback],
                             nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
@@ -298,10 +300,10 @@ def generate_prediction(selected_fold_index):
         earlystopping_callback = EarlyStopping(monitor="val_loss", patience=SECOND_PATIENCE)
         modelcheckpoint_callback = ModelCheckpoint(second_model_weights_path, monitor="val_loss", save_best_only=True)
         model.fit_generator(data_generator(train_image_path_array, categorical_train_label_array,
-                                           infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.RANDOM, batch_size=TRAINING_BATCH_SIZE),
+                                infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.RANDOM, batch_size=TRAINING_BATCH_SIZE),
                             samples_per_epoch=int(len(train_image_path_array) / TRAINING_BATCH_SIZE) * TRAINING_BATCH_SIZE,
                             validation_data=data_generator(validate_image_path_array, categorical_validate_label_array,
-                                                           infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.CENTER, batch_size=TESTING_BATCH_SIZE),
+                                infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.CENTER, batch_size=TESTING_BATCH_SIZE),
                             nb_val_samples=len(validate_image_path_array),
                             callbacks=[learningrateinspector_callback, earlystopping_callback, modelcheckpoint_callback],
                             nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
