@@ -33,7 +33,7 @@ class SELECTION_STRATEGIES(IntEnum):
 # Training/Testing Procedure
 TRAINING_BATCH_SIZE = 64
 TESTING_BATCH_SIZE = 64
-FIRST_INITIAL_LEARNING_RATE = 0.0004
+FIRST_INITIAL_LEARNING_RATE = 0.001
 FIRST_PATIENCE = 1
 SECOND_INITIAL_LEARNING_RATE = 0.0001
 SECOND_PATIENCE = 3
@@ -88,8 +88,8 @@ def preprocess_image(image_path, selection_strategy):
     if np.mean(image) == 0:
         return None
 
-    # Resize image
-    image = resize(image, (WHOLE_IMAGE_SIZE, WHOLE_IMAGE_SIZE), preserve_range=True)
+    # Resize image with scaling
+    image = resize(image, (WHOLE_IMAGE_SIZE, WHOLE_IMAGE_SIZE), preserve_range=False)
 
     # Data augmentation
     valid_start_index = np.arange(WHOLE_IMAGE_SIZE - SELECTED_IMAGE_SIZE + 1)
@@ -115,11 +115,8 @@ def preprocess_image(image_path, selection_strategy):
     image = image[row_start_index:row_start_index + SELECTED_IMAGE_SIZE,
                   column_start_index:column_start_index + SELECTED_IMAGE_SIZE, :]
 
-    # Convert to BGR color space and subtract the mean pixel
+    # Convert to BGR color space
     image = image[:, :, ::-1]
-    image[:, :, 0] -= 103.939
-    image[:, :, 1] -= 116.779
-    image[:, :, 2] -= 123.68
 
     # Transpose the image
     image = image.transpose((2, 0, 1))
