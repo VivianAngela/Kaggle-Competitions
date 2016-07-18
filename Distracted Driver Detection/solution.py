@@ -31,11 +31,13 @@ class SELECTION_STRATEGIES(IntEnum):
     RANDOM = 6
 
 # Training/Testing Procedure
-PATIENCE = 3
 TRAINING_BATCH_SIZE = 64
 TESTING_BATCH_SIZE = 64
-FIRST_INITIAL_LEARNING_RATE = 0.0005
+FIRST_INITIAL_LEARNING_RATE = 0.0004
+FIRST_PATIENCE = 1
 SECOND_INITIAL_LEARNING_RATE = 0.0001
+SECOND_PATIENCE = 3
+MAXIMUM_EPOCH_NUM = 1000000
 
 # Data Set
 VANILLA_WEIGHTS_PATH = "/external/Pretrained Models/Keras/VGG16/vgg16_weights.h5"
@@ -46,8 +48,8 @@ DRIVER_FILE_PATH = os.path.join(INPUT_FOLDER_PATH, "driver_imgs_list.csv")
 SAMPLE_SUBMISSION_FILE_PATH = os.path.join(INPUT_FOLDER_PATH, "sample_submission.csv")
 MODEL_FOLDER_PATH = os.path.join(INPUT_FOLDER_PATH, "models")
 SUBMISSION_FOLDER_PATH = os.path.join(INPUT_FOLDER_PATH, "submissions")
-FIRST_MODEL_PREFIX = "Optimal_Weights_1"
-SECOND_MODEL_PREFIX = "Optimal_Weights_2"
+FIRST_MODEL_WEIGHTS_PREFIX = "First_Model_Weights"
+SECOND_MODEL_WEIGHTS_PREFIX = "Second_Model_Weights"
 SUBMISSION_PREFIX = "Aurora"
 
 def split_training_data_set(selected_fold_index):
@@ -234,9 +236,9 @@ def generate_prediction(selected_fold_index):
     model = init_model()
 
     # The first training procedure
-    first_optimal_weights_path = os.path.join(MODEL_FOLDER_PATH, "{:s}_{:d}.h5".format(
-        FIRST_MODEL_PREFIX, selected_fold_index))
-    if not os.path.isfile(first_optimal_weights_path):
+    first_model_weights_path = os.path.join(MODEL_FOLDER_PATH, "{:s}_{:d}.h5".format(
+        FIRST_MODEL_WEIGHTS_PREFIX, selected_fold_index))
+    if not os.path.isfile(first_model_weights_path):
         print("Freezing all convolutional blocks ...")
         for layer in model.layers[:-6]:
             layer.trainable = False
@@ -250,22 +252,23 @@ def generate_prediction(selected_fold_index):
         print(model.optimizer.lr.get_value())
 
         print("Performing the first training procedure ...")
-        modelcheckpoint_callback = ModelCheckpoint(first_optimal_weights_path, monitor="val_loss", save_best_only=True)
+        earlystopping_callback = EarlyStopping(monitor="val_loss", patience=FIRST_PATIENCE)
+        modelcheckpoint_callback = ModelCheckpoint(first_model_weights_path, monitor="val_loss", save_best_only=True)
         model.fit_generator(data_generator(train_image_path_array, categorical_train_label_array,
                                            infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.RANDOM, batch_size=TRAINING_BATCH_SIZE),
                             samples_per_epoch=int(len(train_image_path_array) / TRAINING_BATCH_SIZE) * TRAINING_BATCH_SIZE,
                             validation_data=data_generator(validate_image_path_array, categorical_validate_label_array,
                                                            infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.CENTER, batch_size=TESTING_BATCH_SIZE),
                             nb_val_samples=len(validate_image_path_array),
-                            callbacks=[modelcheckpoint_callback],
-                            nb_epoch=3, verbose=2)
-    assert os.path.isfile(first_optimal_weights_path)
-    model.load_weights(first_optimal_weights_path)
+                            callbacks=[earlystopping_callback, modelcheckpoint_callback],
+                            nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
+    assert os.path.isfile(first_model_weights_path)
+    model.load_weights(first_model_weights_path)
 
     # The second training procedure
-    second_optimal_weights_path = os.path.join(MODEL_FOLDER_PATH, "{:s}_{:d}.h5".format(
-        SECOND_MODEL_PREFIX, selected_fold_index))
-    if not os.path.isfile(second_optimal_weights_path):
+    second_model_weights_path = os.path.join(MODEL_FOLDER_PATH, "{:s}_{:d}.h5".format(
+        SECOND_MODEL_WEIGHTS_PREFIX, selected_fold_index))
+    if not os.path.isfile(second_model_weights_path):
         print("Freezing all convolutional blocks except the last one ...")
         for layer in model.layers[:-13]:
             layer.trainable = False
@@ -281,8 +284,8 @@ def generate_prediction(selected_fold_index):
         print(model.optimizer.lr.get_value())
 
         print("Performing the second training procedure ...")
-        earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
-        modelcheckpoint_callback = ModelCheckpoint(second_optimal_weights_path, monitor="val_loss", save_best_only=True)
+        earlystopping_callback = EarlyStopping(monitor="val_loss", patience=SECOND_PATIENCE)
+        modelcheckpoint_callback = ModelCheckpoint(second_model_weights_path, monitor="val_loss", save_best_only=True)
         model.fit_generator(data_generator(train_image_path_array, categorical_train_label_array,
                                            infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.RANDOM, batch_size=TRAINING_BATCH_SIZE),
                             samples_per_epoch=int(len(train_image_path_array) / TRAINING_BATCH_SIZE) * TRAINING_BATCH_SIZE,
@@ -290,9 +293,9 @@ def generate_prediction(selected_fold_index):
                                                            infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.CENTER, batch_size=TESTING_BATCH_SIZE),
                             nb_val_samples=len(validate_image_path_array),
                             callbacks=[earlystopping_callback, modelcheckpoint_callback],
-                            nb_epoch=1000000, verbose=2)
-    assert os.path.isfile(second_optimal_weights_path)
-    model.load_weights(second_optimal_weights_path)
+                            nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
+    assert os.path.isfile(second_model_weights_path)
+    model.load_weights(second_model_weights_path)
 
     print("Performing the testing procedure ...")
     for selection_strategy in [SELECTION_STRATEGIES.TOP_LEFT, SELECTION_STRATEGIES.TOP_RIGHT,
