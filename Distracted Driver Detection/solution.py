@@ -5,7 +5,7 @@ import pyprind
 import numpy as np
 import pandas as pd
 from enum import IntEnum
-from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
+from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
 from keras.layers.core import Flatten, Dense, Dropout
 from keras.models import Sequential
@@ -15,6 +15,8 @@ from skimage.io import imread
 from skimage.transform import resize
 from sklearn.cross_validation import LabelKFold
 from sklearn.preprocessing import LabelEncoder
+
+np.random.seed(666666)  # Black Magic
 
 # Cross Validation
 FOLD_NUM = 8
@@ -36,7 +38,7 @@ TESTING_BATCH_SIZE = 64
 FIRST_INITIAL_LEARNING_RATE = 0.001
 FIRST_PATIENCE = 1
 SECOND_INITIAL_LEARNING_RATE = 0.0001
-SECOND_PATIENCE = 3
+SECOND_PATIENCE = 2
 MAXIMUM_EPOCH_NUM = 1000000
 
 # Data Set
@@ -127,16 +129,13 @@ def data_generator(image_path_array, additional_info_array,
     def _data_generator(image_path_array, additional_info_array, infinity_loop, selection_strategy):
         assert len(image_path_array) == len(additional_info_array)
 
-        seed = 0
         while True:
-            np.random.seed(seed)
             for entry_index in np.random.permutation(len(image_path_array)):
                 image_path = image_path_array[entry_index]
                 additional_info = additional_info_array[entry_index]
                 image = preprocess_image(image_path, selection_strategy)
                 if image is not None:
                     yield (image, additional_info)
-            seed += 1
 
             if not infinity_loop:
                 break
@@ -157,8 +156,8 @@ def data_generator(image_path_array, additional_info_array,
     if len(image_list) > 0:
         yield (np.array(image_list), np.array(additional_info_list))
 
-def init_model():
-    # Initiate the convolutional layers
+def init_model(freeze_convolutional_blocks, unique_label_num, learning_rate):
+    # Initiate the convolutional blocks
     model = Sequential()
     model.add(ZeroPadding2D((1, 1), input_shape=(3, SELECTED_IMAGE_SIZE, SELECTED_IMAGE_SIZE)))
     model.add(Convolution2D(64, 3, 3, activation="relu"))
@@ -192,7 +191,7 @@ def init_model():
     model.add(Convolution2D(512, 3, 3, activation="relu"))
     model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
-    # Load vanilla weights of the convolutional layers
+    # Load vanilla weights of the convolutional blocks
     assert os.path.isfile(VANILLA_WEIGHTS_PATH), "Vanilla weights {} does not exist!".format(VANILLA_WEIGHTS_PATH)
     with h5py.File(VANILLA_WEIGHTS_PATH) as weights_file:
         for layer_index in range(weights_file.attrs["nb_layers"]):
@@ -204,29 +203,25 @@ def init_model():
                              for param_index in range(layer_info.attrs["nb_params"])]
             model.layers[layer_index].set_weights(layer_weights)
 
+    # Freeze convolutional blocks in the first training procedure
+    if freeze_convolutional_blocks:
+        print("Freezing convolutional blocks ...")
+        for layer in model.layers:
+            layer.trainable = False
+
     # Initiate the customized fully-connected layers
     model.add(Flatten())
-    model.add(Dense(256, activation="relu"))
+    model.add(Dense(2048, activation="relu"))
     model.add(Dropout(0.5))
-    model.add(Dense(256, activation="relu"))
+    model.add(Dense(2048, activation="relu"))
     model.add(Dropout(0.5))
-    model.add(Dense(10, activation="softmax"))
+    model.add(Dense(unique_label_num, activation="softmax"))
 
     # Compile the neural network
-    optimizer = SGD(lr=0.01, momentum=0.9, nesterov=True)
+    optimizer = SGD(lr=learning_rate, momentum=0.9, decay=0.005, nesterov=True)
     model.compile(optimizer=optimizer, loss="categorical_crossentropy", metrics=["accuracy"])
+
     return model
-
-class LearningRateInspector(Callback):
-    """
-        Inspect the learning rate at the beginning of each epoch.
-    """
-    def __init__(self):
-        super(LearningRateInspector, self).__init__()
-
-    def on_epoch_begin(self, epoch, logs={}):
-        current_learning_rate = self.model.optimizer.lr.get_value()
-        print("Current learning rate is {}.".format(current_learning_rate))
 
 def generate_prediction(selected_fold_index):
     for folder_path in [MODEL_FOLDER_PATH, SUBMISSION_FOLDER_PATH]:
@@ -242,70 +237,51 @@ def generate_prediction(selected_fold_index):
     categorical_train_label_array, encoder = preprocess_labels(train_label_array)
     categorical_validate_label_array, _ = preprocess_labels(validate_label_array, encoder)
 
-    print("Initiating model ...")
-    model = init_model()
-
     # The first training procedure
     first_model_weights_path = os.path.join(MODEL_FOLDER_PATH, "{}_{}.h5".format(
         FIRST_MODEL_WEIGHTS_PREFIX, selected_fold_index))
     if not os.path.isfile(first_model_weights_path):
-        print("Freezing all convolutional blocks ...")
-        for layer in model.layers[:-6]:
-            layer.trainable = False
-
-        print("The trainable properties of all layers are as follows:")
-        for layer in model.layers:
-            print(type(layer), layer.trainable)
-
-        print("Setting learning rate to {:.5f} ...".format(FIRST_INITIAL_LEARNING_RATE))
-        model.optimizer.lr.set_value(FIRST_INITIAL_LEARNING_RATE)
+        print("Initiating the first model ...")
+        first_model = init_model(True, len(encoder.classes_), FIRST_INITIAL_LEARNING_RATE)
 
         print("Performing the first training procedure ...")
-        learningrateinspector_callback = LearningRateInspector()
         earlystopping_callback = EarlyStopping(monitor="val_loss", patience=FIRST_PATIENCE)
         modelcheckpoint_callback = ModelCheckpoint(first_model_weights_path, monitor="val_loss", save_best_only=True)
-        model.fit_generator(data_generator(train_image_path_array, categorical_train_label_array,
-                                infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.RANDOM, batch_size=TRAINING_BATCH_SIZE),
-                            samples_per_epoch=int(len(train_image_path_array) / TRAINING_BATCH_SIZE) * TRAINING_BATCH_SIZE,
-                            validation_data=data_generator(validate_image_path_array, categorical_validate_label_array,
-                                infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.CENTER, batch_size=TESTING_BATCH_SIZE),
-                            nb_val_samples=len(validate_image_path_array),
-                            callbacks=[learningrateinspector_callback, earlystopping_callback, modelcheckpoint_callback],
-                            nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
+        first_model.fit_generator(data_generator(train_image_path_array, categorical_train_label_array,
+                                    infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.RANDOM, batch_size=TRAINING_BATCH_SIZE),
+                                  samples_per_epoch=int(len(train_image_path_array) / TRAINING_BATCH_SIZE) * TRAINING_BATCH_SIZE,
+                                  validation_data=data_generator(validate_image_path_array, categorical_validate_label_array,
+                                    infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.CENTER, batch_size=TESTING_BATCH_SIZE),
+                                  nb_val_samples=len(validate_image_path_array),
+                                  callbacks=[earlystopping_callback, modelcheckpoint_callback],
+                                  nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
     assert os.path.isfile(first_model_weights_path)
-    model.load_weights(first_model_weights_path)
+
+    print("Initiating the second model ...")
+    second_model = init_model(False, len(encoder.classes_), SECOND_INITIAL_LEARNING_RATE)
 
     # The second training procedure
     second_model_weights_path = os.path.join(MODEL_FOLDER_PATH, "{}_{}.h5".format(
         SECOND_MODEL_WEIGHTS_PREFIX, selected_fold_index))
     if not os.path.isfile(second_model_weights_path):
-        print("Freezing all convolutional blocks except the last one ...")
-        for layer in model.layers[:-13]:
-            layer.trainable = False
-        for layer in model.layers[-13:-6]:
-            layer.trainable = True
-
-        print("The trainable properties of all layers are as follows:")
-        for layer in model.layers:
-            print(type(layer), layer.trainable)
-
-        print("Setting learning rate to {:.5f} ...".format(SECOND_INITIAL_LEARNING_RATE))
-        model.optimizer.lr.set_value(SECOND_INITIAL_LEARNING_RATE)
+        print("Loading the weights of the first model ...")
+        second_model.load_weights(first_model_weights_path)
 
         print("Performing the second training procedure ...")
-        learningrateinspector_callback = LearningRateInspector()
         earlystopping_callback = EarlyStopping(monitor="val_loss", patience=SECOND_PATIENCE)
         modelcheckpoint_callback = ModelCheckpoint(second_model_weights_path, monitor="val_loss", save_best_only=True)
-        model.fit_generator(data_generator(train_image_path_array, categorical_train_label_array,
-                                infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.RANDOM, batch_size=TRAINING_BATCH_SIZE),
-                            samples_per_epoch=int(len(train_image_path_array) / TRAINING_BATCH_SIZE) * TRAINING_BATCH_SIZE,
-                            validation_data=data_generator(validate_image_path_array, categorical_validate_label_array,
-                                infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.CENTER, batch_size=TESTING_BATCH_SIZE),
-                            nb_val_samples=len(validate_image_path_array),
-                            callbacks=[learningrateinspector_callback, earlystopping_callback, modelcheckpoint_callback],
-                            nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
+        second_model.fit_generator(data_generator(train_image_path_array, categorical_train_label_array,
+                                    infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.RANDOM, batch_size=TRAINING_BATCH_SIZE),
+                                   samples_per_epoch=int(len(train_image_path_array) / TRAINING_BATCH_SIZE) * TRAINING_BATCH_SIZE,
+                                   validation_data=data_generator(validate_image_path_array, categorical_validate_label_array,
+                                    infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.CENTER, batch_size=TESTING_BATCH_SIZE),
+                                   nb_val_samples=len(validate_image_path_array),
+                                   callbacks=[earlystopping_callback, modelcheckpoint_callback],
+                                   nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
     assert os.path.isfile(second_model_weights_path)
-    model.load_weights(second_model_weights_path)
+
+    print("Loading the weights of the second model ...")
+    second_model.load_weights(second_model_weights_path)
 
     print("Performing the testing procedure ...")
     for selection_strategy in [SELECTION_STRATEGIES.TOP_LEFT, SELECTION_STRATEGIES.TOP_RIGHT,
@@ -330,7 +306,7 @@ def generate_prediction(selected_fold_index):
                                                        infinity_loop=False,
                                                        selection_strategy=selection_strategy,
                                                        batch_size=TESTING_BATCH_SIZE):
-            proba = model.predict_proba(image_array, batch_size=TESTING_BATCH_SIZE, verbose=0)
+            proba = second_model.predict_proba(image_array, batch_size=TESTING_BATCH_SIZE, verbose=0)
             submission_file_content.loc[index_array, encoder.classes_] = proba
             progress_bar.update()
         print(progress_bar)
