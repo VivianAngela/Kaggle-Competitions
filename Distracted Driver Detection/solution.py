@@ -19,7 +19,7 @@ from sklearn.preprocessing import LabelEncoder
 np.random.seed(666666)  # Black Magic
 
 # Cross Validation
-FOLD_NUM = 8
+FOLD_NUM = 6
 
 # Image Processing
 WHOLE_IMAGE_SIZE = 256
@@ -33,12 +33,13 @@ class SELECTION_STRATEGIES(IntEnum):
     RANDOM = 6
 
 # Training/Testing Procedure
-TRAINING_BATCH_SIZE = 64
-TESTING_BATCH_SIZE = 64
+FIRST_TRAINING_BATCH_SIZE = 64
 FIRST_INITIAL_LEARNING_RATE = 0.001
-FIRST_PATIENCE = 1
+FIRST_PATIENCE = 0
+SECOND_TRAINING_BATCH_SIZE = 16
 SECOND_INITIAL_LEARNING_RATE = 0.0001
 SECOND_PATIENCE = 2
+TESTING_BATCH_SIZE = 64
 MAXIMUM_EPOCH_NUM = 1000000
 
 # Data Set
@@ -82,47 +83,46 @@ def preprocess_labels(labels, encoder=None, categorical=True):
     return categorical_labels, encoder
 
 def preprocess_image(image_path, selection_strategy):
-    if not os.path.isfile(image_path):
+    try:
+        # Read the image and omit totally black images
+        image = imread(image_path)
+        assert np.mean(image) != 0
+
+        # Resize image with scaling
+        image = resize(image, (WHOLE_IMAGE_SIZE, WHOLE_IMAGE_SIZE), preserve_range=False)
+
+        # Data augmentation
+        valid_start_index = np.arange(WHOLE_IMAGE_SIZE - SELECTED_IMAGE_SIZE + 1)
+        if selection_strategy == SELECTION_STRATEGIES.TOP_LEFT:
+            row_start_index = valid_start_index[0]
+            column_start_index = valid_start_index[0]
+        elif selection_strategy == SELECTION_STRATEGIES.TOP_RIGHT:
+            row_start_index = valid_start_index[0]
+            column_start_index = valid_start_index[-1]
+        elif selection_strategy == SELECTION_STRATEGIES.BOTTOM_LEFT:
+            row_start_index = valid_start_index[-1]
+            column_start_index = valid_start_index[0]
+        elif selection_strategy == SELECTION_STRATEGIES.BOTTOM_RIGHT:
+            row_start_index = valid_start_index[-1]
+            column_start_index = valid_start_index[-1]
+        elif selection_strategy == SELECTION_STRATEGIES.CENTER:
+            row_start_index = np.median(valid_start_index).astype(np.int)
+            column_start_index = np.median(valid_start_index).astype(np.int)
+        else:
+            row_start_index, column_start_index = np.random.randint(valid_start_index[0],
+                                                                    valid_start_index[-1] + 1,
+                                                                    size=2)
+        image = image[row_start_index:row_start_index + SELECTED_IMAGE_SIZE,
+                      column_start_index:column_start_index + SELECTED_IMAGE_SIZE, :]
+
+        # Convert to BGR color space
+        image = image[:, :, ::-1]
+
+        # Transpose the image
+        image = image.transpose((2, 0, 1))
+        return image.astype("float32")
+    except:
         return None
-
-    # Read the image and omit totally black images
-    image = imread(image_path)
-    if np.mean(image) == 0:
-        return None
-
-    # Resize image with scaling
-    image = resize(image, (WHOLE_IMAGE_SIZE, WHOLE_IMAGE_SIZE), preserve_range=False)
-
-    # Data augmentation
-    valid_start_index = np.arange(WHOLE_IMAGE_SIZE - SELECTED_IMAGE_SIZE + 1)
-    if selection_strategy == SELECTION_STRATEGIES.TOP_LEFT:
-        row_start_index = valid_start_index[0]
-        column_start_index = valid_start_index[0]
-    elif selection_strategy == SELECTION_STRATEGIES.TOP_RIGHT:
-        row_start_index = valid_start_index[0]
-        column_start_index = valid_start_index[-1]
-    elif selection_strategy == SELECTION_STRATEGIES.BOTTOM_LEFT:
-        row_start_index = valid_start_index[-1]
-        column_start_index = valid_start_index[0]
-    elif selection_strategy == SELECTION_STRATEGIES.BOTTOM_RIGHT:
-        row_start_index = valid_start_index[-1]
-        column_start_index = valid_start_index[-1]
-    elif selection_strategy == SELECTION_STRATEGIES.CENTER:
-        row_start_index = np.median(valid_start_index).astype(np.int)
-        column_start_index = np.median(valid_start_index).astype(np.int)
-    else:
-        row_start_index, column_start_index = np.random.randint(valid_start_index[0],
-                                                                valid_start_index[-1] + 1,
-                                                                size=2)
-    image = image[row_start_index:row_start_index + SELECTED_IMAGE_SIZE,
-                  column_start_index:column_start_index + SELECTED_IMAGE_SIZE, :]
-
-    # Convert to BGR color space
-    image = image[:, :, ::-1]
-
-    # Transpose the image
-    image = image.transpose((2, 0, 1))
-    return image.astype("float32")
 
 def data_generator(image_path_array, additional_info_array,
                    infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.RANDOM, batch_size=32):
@@ -156,7 +156,7 @@ def data_generator(image_path_array, additional_info_array,
     if len(image_list) > 0:
         yield (np.array(image_list), np.array(additional_info_list))
 
-def init_model(freeze_convolutional_blocks, unique_label_num, learning_rate):
+def init_model(unique_label_num, first_trainable_layer_index=None, learning_rate=0.001):
     # Initiate the convolutional blocks
     model = Sequential()
     model.add(ZeroPadding2D((1, 1), input_shape=(3, SELECTED_IMAGE_SIZE, SELECTED_IMAGE_SIZE)))
@@ -203,19 +203,24 @@ def init_model(freeze_convolutional_blocks, unique_label_num, learning_rate):
                              for param_index in range(layer_info.attrs["nb_params"])]
             model.layers[layer_index].set_weights(layer_weights)
 
-    # Freeze convolutional blocks in the first training procedure
-    if freeze_convolutional_blocks:
-        print("Freezing convolutional blocks ...")
-        for layer in model.layers:
-            layer.trainable = False
-
     # Initiate the customized fully-connected layers
     model.add(Flatten())
-    model.add(Dense(2048, activation="relu"))
+    model.add(Dense(1024, activation="relu"))
     model.add(Dropout(0.5))
-    model.add(Dense(2048, activation="relu"))
+    model.add(Dense(1024, activation="relu"))
     model.add(Dropout(0.5))
     model.add(Dense(unique_label_num, activation="softmax"))
+
+    # Freeze layers
+    if first_trainable_layer_index is not None:
+        print("Freezing layers until layer {} ...".format(first_trainable_layer_index))
+        for layer in model.layers[:first_trainable_layer_index]:
+            layer.trainable = False
+
+    # List the trainable properties
+    print("The trainable properties of all layers are as follows:")
+    for layer in model.layers:
+        print(type(layer), layer.trainable)
 
     # Compile the neural network
     optimizer = SGD(lr=learning_rate, momentum=0.9, decay=0.005, nesterov=True)
@@ -242,14 +247,14 @@ def generate_prediction(selected_fold_index):
         FIRST_MODEL_WEIGHTS_PREFIX, selected_fold_index))
     if not os.path.isfile(first_model_weights_path):
         print("Initiating the first model ...")
-        first_model = init_model(True, len(encoder.classes_), FIRST_INITIAL_LEARNING_RATE)
+        first_model = init_model(len(encoder.classes_), -6, FIRST_INITIAL_LEARNING_RATE)
 
         print("Performing the first training procedure ...")
         earlystopping_callback = EarlyStopping(monitor="val_loss", patience=FIRST_PATIENCE)
         modelcheckpoint_callback = ModelCheckpoint(first_model_weights_path, monitor="val_loss", save_best_only=True)
         first_model.fit_generator(data_generator(train_image_path_array, categorical_train_label_array,
-                                    infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.RANDOM, batch_size=TRAINING_BATCH_SIZE),
-                                  samples_per_epoch=int(len(train_image_path_array) / TRAINING_BATCH_SIZE) * TRAINING_BATCH_SIZE,
+                                    infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.RANDOM, batch_size=FIRST_TRAINING_BATCH_SIZE),
+                                  samples_per_epoch=int(len(train_image_path_array) / FIRST_TRAINING_BATCH_SIZE) * FIRST_TRAINING_BATCH_SIZE,
                                   validation_data=data_generator(validate_image_path_array, categorical_validate_label_array,
                                     infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.CENTER, batch_size=TESTING_BATCH_SIZE),
                                   nb_val_samples=len(validate_image_path_array),
@@ -258,7 +263,7 @@ def generate_prediction(selected_fold_index):
     assert os.path.isfile(first_model_weights_path)
 
     print("Initiating the second model ...")
-    second_model = init_model(False, len(encoder.classes_), SECOND_INITIAL_LEARNING_RATE)
+    second_model = init_model(len(encoder.classes_), None, SECOND_INITIAL_LEARNING_RATE)
 
     # The second training procedure
     second_model_weights_path = os.path.join(MODEL_FOLDER_PATH, "{}_{}.h5".format(
@@ -271,8 +276,8 @@ def generate_prediction(selected_fold_index):
         earlystopping_callback = EarlyStopping(monitor="val_loss", patience=SECOND_PATIENCE)
         modelcheckpoint_callback = ModelCheckpoint(second_model_weights_path, monitor="val_loss", save_best_only=True)
         second_model.fit_generator(data_generator(train_image_path_array, categorical_train_label_array,
-                                    infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.RANDOM, batch_size=TRAINING_BATCH_SIZE),
-                                   samples_per_epoch=int(len(train_image_path_array) / TRAINING_BATCH_SIZE) * TRAINING_BATCH_SIZE,
+                                    infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.RANDOM, batch_size=SECOND_TRAINING_BATCH_SIZE),
+                                   samples_per_epoch=int(len(train_image_path_array) / SECOND_TRAINING_BATCH_SIZE) * SECOND_TRAINING_BATCH_SIZE,
                                    validation_data=data_generator(validate_image_path_array, categorical_validate_label_array,
                                     infinity_loop=True, selection_strategy=SELECTION_STRATEGIES.CENTER, batch_size=TESTING_BATCH_SIZE),
                                    nb_val_samples=len(validate_image_path_array),
