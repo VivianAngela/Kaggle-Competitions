@@ -25,11 +25,12 @@ IMAGE_SIZE = 224
 FIRST_TRAINING_BATCH_SIZE = 64
 FIRST_INITIAL_LEARNING_RATE = 0.001
 FIRST_PATIENCE = 0
+FIRST_MAXIMUM_EPOCH_NUM = 3
 SECOND_TRAINING_BATCH_SIZE = 16
 SECOND_INITIAL_LEARNING_RATE = 0.0001
-SECOND_PATIENCE = 2
+SECOND_PATIENCE = 1
+SECOND_MAXIMUM_EPOCH_NUM = 1000000
 TESTING_BATCH_SIZE = 64
-MAXIMUM_EPOCH_NUM = 1000000
 
 # Data Set
 VANILLA_WEIGHTS_PATH = "/external/Pretrained Models/Keras/VGG16/vgg16_weights.h5"
@@ -229,7 +230,7 @@ def generate_prediction(selected_fold_index):
                                     infinity_loop=True, batch_size=TESTING_BATCH_SIZE),
                                   nb_val_samples=len(validate_image_path_array),
                                   callbacks=[earlystopping_callback, modelcheckpoint_callback],
-                                  nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
+                                  nb_epoch=FIRST_MAXIMUM_EPOCH_NUM, verbose=2)
     assert os.path.isfile(first_model_weights_path)
 
     print("Initiating the second model ...")
@@ -252,7 +253,7 @@ def generate_prediction(selected_fold_index):
                                     infinity_loop=True, batch_size=TESTING_BATCH_SIZE),
                                    nb_val_samples=len(validate_image_path_array),
                                    callbacks=[earlystopping_callback, modelcheckpoint_callback],
-                                   nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
+                                   nb_epoch=SECOND_MAXIMUM_EPOCH_NUM, verbose=2)
     assert os.path.isfile(second_model_weights_path)
 
     print("Loading the weights of the second model ...")
