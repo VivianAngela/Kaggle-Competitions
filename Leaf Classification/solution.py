@@ -1,4 +1,5 @@
 import os
+import glob
 import numpy as np
 import pandas as pd
 
@@ -48,6 +49,29 @@ def init_model(feature_dim, label_num):
     model.compile(loss="categorical_crossentropy", optimizer="adadelta", metrics=["accuracy"])
 
     return model
+
+def ensemble_predictions():
+    def _ensemble_predictions(ensemble_func, ensemble_submission_file_name):
+        ensemble_proba = ensemble_func(proba_array, axis=0)
+        ensemble_proba = ensemble_proba / np.sum(ensemble_proba, axis=1)[:, np.newaxis]
+        ensemble_submission_file_content.loc[:, proba_columns] = ensemble_proba
+        ensemble_submission_file_content.to_csv(os.path.join(SUBMISSION_FOLDER_PATH, ensemble_submission_file_name), index=False)
+
+    # Read predictions
+    submission_file_path_list = glob.glob(os.path.join(SUBMISSION_FOLDER_PATH, "submission_*.csv"))
+    submission_file_content_list = [pd.read_csv(submission_file_path) for submission_file_path in submission_file_path_list]
+    ensemble_submission_file_content = submission_file_content_list[0]
+
+    # Concatenate predictions
+    proba_columns = list(set(ensemble_submission_file_content) - {ID_COLUMN_NAME})
+    proba_list = [np.expand_dims(submission_file_content.as_matrix(proba_columns), axis=0)
+                  for submission_file_content in submission_file_content_list]
+    proba_array = np.vstack(proba_list)
+
+    # Ensemble predictions
+    for ensemble_func, ensemble_submission_file_name in \
+        zip([np.max, np.min, np.mean, np.median], ["max.csv", "min.csv", "mean.csv", "median.csv"]):
+        _ensemble_predictions(ensemble_func, ensemble_submission_file_name)
 
 def run():
     # Read file content
@@ -116,6 +140,9 @@ def run():
         submission_file_content = pd.DataFrame(test_probabilities, columns=label_binarizer.classes_)
         submission_file_content[ID_COLUMN_NAME] = test_id_array
         submission_file_content.to_csv(submission_file_path, index=False)
+
+    # Perform ensembling
+    ensemble_predictions()
 
     print("All done!")
 
