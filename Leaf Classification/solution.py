@@ -2,52 +2,120 @@ import os
 import numpy as np
 import pandas as pd
 
-from skimage.io import imread
-from skimage.transform import resize
+from keras.callbacks import ModelCheckpoint
+from keras.layers.advanced_activations import PReLU
+from keras.layers.core import Dense, Dropout
+from keras.layers.normalization import BatchNormalization
+from keras.models import Sequential
 from sklearn.cross_validation import StratifiedShuffleSplit
-from sklearn.preprocessing import LabelEncoder
-
-# Image Processing
-IMAGE_SIZE = 64
+from sklearn.preprocessing import LabelBinarizer
 
 # Data Set
-DATASET_PATH = "./input"
+DATASET_FOLDER_PATH = "./"
+INPUT_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "input")
+TRAIN_FILE_PATH = os.path.join(INPUT_FOLDER_PATH, "train.csv")
+TEST_FILE_PATH = os.path.join(INPUT_FOLDER_PATH, "test.csv")
+SUBMISSION_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "submission")
+ID_COLUMN_NAME = "id"
+LABEL_COLUMN_NAME = "species"
 
-def preprocess_image(image_path):
-    try:
-        # Read the image as a binary image
-        image = imread(image_path)
+# Model Structure
+BLOCK_NUM = 3
+DENSE_DIM = 512
+DROPOUT_RATIO = 0.8
 
-        # Omit totally black rows and columns
-        image = image[np.sum(image, axis=1) != 0][:, np.sum(image, axis=0) != 0]
+# Training Procedure
+CROSS_VALIDATION_NUM = 20
+MAXIMUM_EPOCH_NUM = 5000
+TRAIN_BATCH_SIZE = 32
+TEST_BATCH_SIZE = 2048
 
-        # Further processing
-        row_num, column_num = image.shape
-        higher_num = max(image.shape)
-        row_start_index = int((higher_num - row_num) / 2)
-        column_start_index = int((higher_num - column_num) / 2)
-        final_image = np.zeros((higher_num, higher_num))
-        final_image[row_start_index:row_start_index + row_num,
-                    column_start_index:column_start_index + column_num] = image
-        final_image = resize(final_image, (IMAGE_SIZE, IMAGE_SIZE)).astype(np.bool).astype(np.float32)
-        return final_image
-    except:
-        return None
+def init_model(feature_dim, label_num):
+    model = Sequential()
+
+    for block_index in range(BLOCK_NUM):
+        if block_index == 0:
+            model.add(Dense(DENSE_DIM, input_dim=feature_dim))
+        else:
+            model.add(Dense(DENSE_DIM))
+
+        model.add(PReLU())
+        model.add(BatchNormalization())
+        model.add(Dropout(DROPOUT_RATIO))
+
+    model.add(Dense(label_num, activation="softmax"))
+
+    model.compile(loss="categorical_crossentropy", optimizer="adadelta", metrics=["accuracy"])
+
+    return model
 
 def run():
-    # Read file content of the training data set
-    training_file_content = pd.read_csv(os.path.join(DATASET_PATH, "train.csv"))
-    id_with_species = training_file_content[["id", "species"]].as_matrix()
-    id_array, species_array = id_with_species[:, 0], id_with_species[:, 1]
+    # Read file content
+    train_file_content = pd.read_csv(TRAIN_FILE_PATH)
+    test_file_content = pd.read_csv(TEST_FILE_PATH)
+
+    # Perform scaling
+    feature_column_list = list(train_file_content.drop([ID_COLUMN_NAME, LABEL_COLUMN_NAME], axis=1))
+    for feature_keyword in ["shape", "texture", "margin"]:
+        selected_feature_column_list = [feature_column for feature_column in feature_column_list
+                                        if feature_keyword in feature_column]
+
+        max_value = np.max(train_file_content[selected_feature_column_list].as_matrix())
+        min_value = np.min(train_file_content[selected_feature_column_list].as_matrix())
+
+        train_file_content[selected_feature_column_list] = (train_file_content[selected_feature_column_list] - min_value) / (max_value - min_value)
+        test_file_content[selected_feature_column_list] = (test_file_content[selected_feature_column_list] - min_value) / (max_value - min_value)
+
+    # Split data
+    train_id_with_species = train_file_content[[ID_COLUMN_NAME, LABEL_COLUMN_NAME]].as_matrix()
+    train_id_array, train_species_array = np.transpose(train_id_with_species)
+    train_X = train_file_content.drop([ID_COLUMN_NAME, LABEL_COLUMN_NAME], axis=1).as_matrix()
+    test_id_array = test_file_content[ID_COLUMN_NAME].as_matrix()
+    test_X = test_file_content.drop([ID_COLUMN_NAME], axis=1).as_matrix()
 
     # Encode labels
-    label_encoder = LabelEncoder()
-    encoded_species_array = label_encoder.fit_transform(species_array)
+    label_binarizer = LabelBinarizer()
+    train_Y = label_binarizer.fit_transform(train_species_array)
+
+    # Initiate model
+    model = init_model(train_X.shape[1], len(label_binarizer.classes_))
+    vanilla_weights = model.get_weights()
 
     # Cross validation
-    cross_validation_iterator = StratifiedShuffleSplit(encoded_species_array, n_iter=1, test_size=0.2, random_state=0)
-    for train_index_array, test_index_array in cross_validation_iterator:
-        break
+    cross_validation_iterator = StratifiedShuffleSplit(train_species_array,
+                                n_iter=CROSS_VALIDATION_NUM, test_size=0.2, random_state=0)
+    for cross_validation_index, (train_index, valid_index) in enumerate(cross_validation_iterator, start=1):
+        print("Working on {}/{} ...".format(cross_validation_index, CROSS_VALIDATION_NUM))
+
+        optimal_weights_path = "/tmp/Optimal_Weights_{}.h5".format(cross_validation_index)
+        submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "submission_{}.csv".format(cross_validation_index))
+
+        if os.path.isfile(submission_file_path):
+            continue
+
+        if not os.path.isfile(optimal_weights_path):
+            # Load the vanilla weights
+            model.set_weights(vanilla_weights)
+
+            # Perform the training procedure
+            modelcheckpoint_callback = ModelCheckpoint(optimal_weights_path, monitor="val_loss", save_best_only=True)
+            model.fit(train_X[train_index], train_Y[train_index],
+                      batch_size=TRAIN_BATCH_SIZE, nb_epoch=MAXIMUM_EPOCH_NUM,
+                      validation_data=(train_X[valid_index], train_Y[valid_index]),
+                      callbacks=[modelcheckpoint_callback], verbose=2)
+
+        # Load the optimal weights
+        model.load_weights(optimal_weights_path)
+
+        # Perform the testing procedure
+        test_probabilities = model.predict_proba(test_X, batch_size=TEST_BATCH_SIZE, verbose=2)
+
+        # Save submission to disk
+        if not os.path.isdir(SUBMISSION_FOLDER_PATH):
+            os.makedirs(SUBMISSION_FOLDER_PATH)
+        submission_file_content = pd.DataFrame(test_probabilities, columns=label_binarizer.classes_)
+        submission_file_content[ID_COLUMN_NAME] = test_id_array
+        submission_file_content.to_csv(submission_file_path, index=False)
 
     print("All done!")
 
