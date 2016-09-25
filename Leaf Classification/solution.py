@@ -3,16 +3,16 @@ import glob
 import numpy as np
 import pandas as pd
 
-from skimage import img_as_ubyte
-from skimage.feature import local_binary_pattern
-from skimage.io import imread
 from keras.callbacks import ModelCheckpoint
 from keras.layers.advanced_activations import PReLU
 from keras.layers.core import Dense, Dropout
 from keras.layers.normalization import BatchNormalization
 from keras.models import Sequential
+from skimage import img_as_ubyte
+from skimage.feature import local_binary_pattern
+from skimage.io import imread
 from sklearn.cross_validation import StratifiedShuffleSplit
-from sklearn.preprocessing import LabelBinarizer
+from sklearn.preprocessing import LabelBinarizer, StandardScaler
 
 # Data Set
 DATASET_FOLDER_PATH = "./"
@@ -33,7 +33,7 @@ DENSE_DIM = 512
 DROPOUT_RATIO = 0.8
 
 # Training Procedure
-CROSS_VALIDATION_NUM = 20
+CROSS_VALIDATION_NUM = 50
 MAXIMUM_EPOCH_NUM = 5000
 TRAIN_BATCH_SIZE = 32
 TEST_BATCH_SIZE = 2048
@@ -134,15 +134,10 @@ def run():
 
     # Perform scaling
     feature_column_list = list(train_file_content.drop([ID_COLUMN_NAME, LABEL_COLUMN_NAME], axis=1))
-    for feature_keyword in ["shape", "texture", "margin", FEATURE_NAME_PREFIX]:
-        selected_feature_column_list = [feature_column for feature_column in feature_column_list
-                                        if feature_keyword in feature_column]
-
-        max_value = np.max(train_file_content[selected_feature_column_list].as_matrix())
-        min_value = np.min(train_file_content[selected_feature_column_list].as_matrix())
-
-        train_file_content[selected_feature_column_list] = (train_file_content[selected_feature_column_list] - min_value) / (max_value - min_value)
-        test_file_content[selected_feature_column_list] = (test_file_content[selected_feature_column_list] - min_value) / (max_value - min_value)
+    standard_scaler = StandardScaler()
+    standard_scaler.fit(train_file_content[feature_column_list].as_matrix())
+    train_file_content[feature_column_list] = standard_scaler.transform(train_file_content[feature_column_list].as_matrix())
+    test_file_content[feature_column_list] = standard_scaler.transform(test_file_content[feature_column_list].as_matrix())
 
     # Split data
     train_species_array = train_file_content[LABEL_COLUMN_NAME].as_matrix()
