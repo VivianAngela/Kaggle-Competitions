@@ -8,17 +8,24 @@ from keras.layers.advanced_activations import PReLU
 from keras.layers.core import Dense, Dropout
 from keras.layers.normalization import BatchNormalization
 from keras.models import Sequential
+from skimage import img_as_ubyte
+from skimage.feature import local_binary_pattern
+from skimage.io import imread
 from sklearn.cross_validation import StratifiedShuffleSplit
-from sklearn.preprocessing import LabelBinarizer
+from sklearn.preprocessing import LabelBinarizer, StandardScaler
 
 # Data Set
 DATASET_FOLDER_PATH = "./"
 INPUT_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "input")
+IMAGE_FOLDER_PATH = os.path.join(INPUT_FOLDER_PATH, "images")
 TRAIN_FILE_PATH = os.path.join(INPUT_FOLDER_PATH, "train.csv")
 TEST_FILE_PATH = os.path.join(INPUT_FOLDER_PATH, "test.csv")
 SUBMISSION_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "submission")
 ID_COLUMN_NAME = "id"
 LABEL_COLUMN_NAME = "species"
+IMAGE_EXTENSION = ".jpg"
+FEATURE_EXTENSION = "_LBP.csv"
+FEATURE_NAME_PREFIX = "LBP"
 
 # Model Structure
 BLOCK_NUM = 3
@@ -26,10 +33,53 @@ DENSE_DIM = 512
 DROPOUT_RATIO = 0.8
 
 # Training Procedure
-CROSS_VALIDATION_NUM = 20
+CROSS_VALIDATION_NUM = 50
 MAXIMUM_EPOCH_NUM = 5000
 TRAIN_BATCH_SIZE = 32
 TEST_BATCH_SIZE = 2048
+
+def retrieve_LBP_feature_histogram(image_path):
+    try:
+        # Read feature directly from file
+        image_feature_path = image_path + FEATURE_EXTENSION
+        if os.path.isfile(image_feature_path):
+            LBP_feature_histogram = np.genfromtxt(image_feature_path, delimiter=",")
+            return LBP_feature_histogram
+
+        # Define LBP parameters
+        radius = 5
+        n_points = 8
+        bins_num = pow(2, n_points)
+        LBP_value_range = (0, pow(2, n_points) - 1)
+
+        # Retrieve feature
+        assert os.path.isfile(image_path)
+        image_content_in_gray = imread(image_path, as_grey=True)
+        image_content_in_gray = img_as_ubyte(image_content_in_gray)
+        LBP_feature = local_binary_pattern(image_content_in_gray, n_points, radius)
+        LBP_feature_histogram, _ = np.histogram(LBP_feature, bins=bins_num, range=LBP_value_range, density=True)
+
+        # Save feature to file
+        assert LBP_feature_histogram is not None
+        np.savetxt(image_feature_path, LBP_feature_histogram, delimiter=",")
+        return LBP_feature_histogram
+    except:
+        print("Unable to retrieve LBP feature histogram in {}.".format(os.path.basename(image_path)))
+        return None
+
+def add_LBP_feature_histogram(file_content):
+    LBP_feature_histogram_list = []
+    id_array = file_content[ID_COLUMN_NAME].as_matrix()
+    for id_value in id_array:
+        image_path = os.path.join(IMAGE_FOLDER_PATH, "{}{}".format(id_value, IMAGE_EXTENSION))
+        LBP_feature_histogram = retrieve_LBP_feature_histogram(image_path)
+        LBP_feature_histogram_list.append(LBP_feature_histogram)
+
+    LBP_feature_histogram_dim = len(LBP_feature_histogram_list[0])
+    LBP_feature_histogram_array = np.array(LBP_feature_histogram_list)
+    for entry_index in range(LBP_feature_histogram_dim):
+        feature_name = FEATURE_NAME_PREFIX + str(entry_index + 1)
+        file_content[feature_name] = LBP_feature_histogram_array[:, entry_index]
 
 def init_model(feature_dim, label_num):
     model = Sequential()
@@ -78,21 +128,19 @@ def run():
     train_file_content = pd.read_csv(TRAIN_FILE_PATH)
     test_file_content = pd.read_csv(TEST_FILE_PATH)
 
+    # Add LBP feature histogram
+    add_LBP_feature_histogram(train_file_content)
+    add_LBP_feature_histogram(test_file_content)
+
     # Perform scaling
     feature_column_list = list(train_file_content.drop([ID_COLUMN_NAME, LABEL_COLUMN_NAME], axis=1))
-    for feature_keyword in ["shape", "texture", "margin"]:
-        selected_feature_column_list = [feature_column for feature_column in feature_column_list
-                                        if feature_keyword in feature_column]
-
-        max_value = np.max(train_file_content[selected_feature_column_list].as_matrix())
-        min_value = np.min(train_file_content[selected_feature_column_list].as_matrix())
-
-        train_file_content[selected_feature_column_list] = (train_file_content[selected_feature_column_list] - min_value) / (max_value - min_value)
-        test_file_content[selected_feature_column_list] = (test_file_content[selected_feature_column_list] - min_value) / (max_value - min_value)
+    standard_scaler = StandardScaler()
+    standard_scaler.fit(train_file_content[feature_column_list].as_matrix())
+    train_file_content[feature_column_list] = standard_scaler.transform(train_file_content[feature_column_list].as_matrix())
+    test_file_content[feature_column_list] = standard_scaler.transform(test_file_content[feature_column_list].as_matrix())
 
     # Split data
-    train_id_with_species = train_file_content[[ID_COLUMN_NAME, LABEL_COLUMN_NAME]].as_matrix()
-    train_id_array, train_species_array = np.transpose(train_id_with_species)
+    train_species_array = train_file_content[LABEL_COLUMN_NAME].as_matrix()
     train_X = train_file_content.drop([ID_COLUMN_NAME, LABEL_COLUMN_NAME], axis=1).as_matrix()
     test_id_array = test_file_content[ID_COLUMN_NAME].as_matrix()
     test_X = test_file_content.drop([ID_COLUMN_NAME], axis=1).as_matrix()
