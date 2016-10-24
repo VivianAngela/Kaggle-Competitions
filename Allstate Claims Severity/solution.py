@@ -46,9 +46,12 @@ def load_data():
     continuous_feature_column_list = [feature_column for feature_column in feature_column_list if feature_column.startswith("cont")]
 
     # Process categorical features
+    onehot_encoding_mask = []
     for categorical_feature_column in categorical_feature_column_list:
-        combined_file_content[categorical_feature_column] = LabelEncoder().fit_transform(combined_file_content[categorical_feature_column])
-    categorical_feature_array = OneHotEncoder(dtype=np.bool, sparse=False).fit_transform(combined_file_content[categorical_feature_column_list])
+        label_encoder = LabelEncoder()
+        combined_file_content[categorical_feature_column] = label_encoder.fit_transform(combined_file_content[categorical_feature_column])
+        onehot_encoding_mask.append(len(label_encoder.classes_) > 2)
+    sparse_categorical_feature_array = OneHotEncoder(categorical_features=onehot_encoding_mask, dtype=np.bool, sparse=True).fit_transform(combined_file_content[categorical_feature_column_list])
     combined_file_content.drop(categorical_feature_column_list, axis=1, inplace=True)
 
     # Process continuous features
@@ -57,10 +60,10 @@ def load_data():
     combined_file_content.drop(continuous_feature_column_list, axis=1, inplace=True)
 
     # Combine categorical and continuous features
-    X_array = np.hstack((categorical_feature_array, continuous_feature_array)).astype(np.float32)
+    X_array = np.hstack((sparse_categorical_feature_array.toarray(), continuous_feature_array)).astype(np.float32)
     Y_array = combined_file_content[LABEL_COLUMN_NAME].as_matrix()
     ID_array = combined_file_content[ID_COLUMN_NAME].as_matrix()
-    del(categorical_feature_array, continuous_feature_array)
+    del(sparse_categorical_feature_array, continuous_feature_array)
 
     # Separate the training and testing data set
     test_data_mask = np.isnan(Y_array)
