@@ -57,6 +57,7 @@ def load_data():
             discard_function = lambda input_value: np.nan if input_value in unique_data_array_to_discard else input_value
             combined_file_content[categorical_feature_column] = combined_file_content[categorical_feature_column].apply(discard_function)
         combined_file_content[categorical_feature_column], _ = pd.factorize(combined_file_content[categorical_feature_column])
+        combined_file_content[categorical_feature_column] -= np.min(combined_file_content[categorical_feature_column])
 
     # Process categorical features: perform one-hot encoding
     onehot_encoding_mask = []
