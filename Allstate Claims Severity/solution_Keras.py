@@ -39,13 +39,26 @@ def load_data():
     test_file_content = pd.read_csv(TEST_FILE_PATH)
     combined_file_content = pd.concat([train_file_content, test_file_content])
     del(train_file_content, test_file_content)
+    train_data_mask = combined_file_content[LABEL_COLUMN_NAME].notnull().as_matrix()
+    test_data_mask = combined_file_content[LABEL_COLUMN_NAME].isnull().as_matrix()
 
     # Seperate the feature columns
     feature_column_list = list(combined_file_content.drop([ID_COLUMN_NAME, LABEL_COLUMN_NAME], axis=1))
     categorical_feature_column_list = [feature_column for feature_column in feature_column_list if feature_column.startswith("cat")]
     continuous_feature_column_list = [feature_column for feature_column in feature_column_list if feature_column.startswith("cont")]
 
-    # Process categorical features
+    # Process categorical features: remove obsolete unique values and factorize the values
+    for categorical_feature_column in categorical_feature_column_list:
+        unique_train_data_array = combined_file_content[categorical_feature_column][train_data_mask].unique()
+        unique_test_data_array = combined_file_content[categorical_feature_column][test_data_mask].unique()
+        unique_data_array_to_discard = np.setdiff1d(np.union1d(unique_train_data_array, unique_test_data_array),
+                                                    np.intersect1d(unique_train_data_array, unique_test_data_array))
+        if len(unique_data_array_to_discard) > 0:
+            discard_function = lambda input_value: np.nan if input_value in unique_data_array_to_discard else input_value
+            combined_file_content[categorical_feature_column] = combined_file_content[categorical_feature_column].apply(discard_function)
+        combined_file_content[categorical_feature_column], _ = pd.factorize(combined_file_content[categorical_feature_column])
+
+    # Process categorical features: perform one-hot encoding
     onehot_encoding_mask = []
     for categorical_feature_column in categorical_feature_column_list:
         label_encoder = LabelEncoder()
@@ -66,8 +79,6 @@ def load_data():
     del(sparse_categorical_feature_array, continuous_feature_array)
 
     # Separate the training and testing data set
-    test_data_mask = np.isnan(Y_array)
-    train_data_mask = np.logical_not(test_data_mask)
     X_train = X_array[train_data_mask]
     Y_train = Y_array[train_data_mask]
     X_test = X_array[test_data_mask]
