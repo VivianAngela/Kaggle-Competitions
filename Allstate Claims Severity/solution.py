@@ -128,7 +128,7 @@ def run():
     vanilla_weights = model.get_weights()
 
     # Cross validation
-    cross_validation_iterator = ShuffleSplit(n_splits=CROSS_VALIDATION_NUM, test_size=0.2, random_state=0)
+    cross_validation_iterator = ShuffleSplit(n_splits=CROSS_VALIDATION_NUM, test_size=0.1, random_state=0)
     for cross_validation_index, (train_index, valid_index) in enumerate(cross_validation_iterator.split(X_train), start=1):
         print("Working on {}/{} ...".format(cross_validation_index, CROSS_VALIDATION_NUM))
 
