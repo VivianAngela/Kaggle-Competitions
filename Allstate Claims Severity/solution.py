@@ -121,6 +121,7 @@ def ensemble_predictions():
 def run():
     # Load data set
     X_train, Y_train, X_test, submission_file_content = load_data()
+    Y_train = np.log(Y_train + 200)
 
     # Initiate model
     model = init_model(X_train.shape[1])
@@ -158,7 +159,7 @@ def run():
         # Save submission to disk
         if not os.path.isdir(SUBMISSION_FOLDER_PATH):
             os.makedirs(SUBMISSION_FOLDER_PATH)
-        submission_file_content[LABEL_COLUMN_NAME] = Y_test
+        submission_file_content[LABEL_COLUMN_NAME] = np.exp(Y_test) - 200
         submission_file_content.to_csv(submission_file_path, index=False)
 
     # Perform ensembling
