@@ -3,6 +3,7 @@ import glob
 import numpy as np
 import pandas as pd
 
+from keras import backend as K
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.layers.advanced_activations import PReLU
 from keras.layers.core import Dense, Dropout
@@ -88,6 +89,9 @@ def load_data():
 
     return X_train, Y_train, X_test, submission_file_content
 
+def actual_mae(y_true, y_pred):
+    return K.mean(K.abs(K.exp(y_pred) - K.exp(y_true)))
+
 def init_model(feature_dim):
     model = Sequential()
 
@@ -104,7 +108,7 @@ def init_model(feature_dim):
     model.add(Dense(1))
 
     optimizer = Adam(lr=0.001, decay=1e-6)
-    model.compile(loss="mean_absolute_error", optimizer=optimizer)
+    model.compile(loss="mae", optimizer=optimizer, metrics=[actual_mae])
 
     return model
 
@@ -155,7 +159,7 @@ def run():
             model.set_weights(vanilla_weights)
 
             # Perform the training procedure
-            earlystopping_callback = EarlyStopping(monitor="val_loss", patience=EARLYSTOPPING_PATIENCE)
+            earlystopping_callback = EarlyStopping(monitor="val_actual_mae", patience=EARLYSTOPPING_PATIENCE)
             modelcheckpoint_callback = ModelCheckpoint(optimal_weights_path, monitor="val_loss", save_best_only=True)
             model.fit(X_train[train_index], Y_train[train_index],
                             batch_size=TRAIN_BATCH_SIZE, nb_epoch=MAXIMUM_EPOCH_NUM,
