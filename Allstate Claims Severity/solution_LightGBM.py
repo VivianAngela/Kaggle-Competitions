@@ -3,14 +3,10 @@ import glob
 import numpy as np
 import pandas as pd
 
-from keras.callbacks import EarlyStopping, ModelCheckpoint
-from keras.layers.advanced_activations import PReLU
-from keras.layers.core import Dense, Dropout
-from keras.layers.normalization import BatchNormalization
-from keras.models import Sequential
-from keras.optimizers import Adam
+from pylightgbm.models import GBMRegressor
 from sklearn.model_selection import ShuffleSplit
-from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
+
+os.environ["LIGHTGBM_EXEC"] = "/opt/LightGBM/lightgbm"
 
 # Data Set
 DATASET_FOLDER_PATH = "./"
@@ -21,17 +17,10 @@ SUBMISSION_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "submission")
 ID_COLUMN_NAME = "id"
 LABEL_COLUMN_NAME = "loss"
 
-# Model Structure
-BLOCK_NUM = 3
-DENSE_DIM = 512
-DROPOUT_RATIO = 0.5
-
 # Training Procedure
 CROSS_VALIDATION_NUM = 10
-MAXIMUM_EPOCH_NUM = 1000000
-EARLYSTOPPING_PATIENCE = 20
-TRAIN_BATCH_SIZE = 32
-TEST_BATCH_SIZE = 1024
+NUM_ITERATIONS = 1000000
+EARLY_STOPPING_ROUND = 200
 
 def load_data():
     # Read file content
@@ -39,32 +28,29 @@ def load_data():
     test_file_content = pd.read_csv(TEST_FILE_PATH)
     combined_file_content = pd.concat([train_file_content, test_file_content])
     del(train_file_content, test_file_content)
+    train_data_mask = combined_file_content[LABEL_COLUMN_NAME].notnull().as_matrix()
+    test_data_mask = combined_file_content[LABEL_COLUMN_NAME].isnull().as_matrix()
 
     # Seperate the feature columns
     feature_column_list = list(combined_file_content.drop([ID_COLUMN_NAME, LABEL_COLUMN_NAME], axis=1))
     categorical_feature_column_list = [feature_column for feature_column in feature_column_list if feature_column.startswith("cat")]
-    continuous_feature_column_list = [feature_column for feature_column in feature_column_list if feature_column.startswith("cont")]
 
-    # Process categorical features
+    # Process categorical features: remove obsolete unique values and factorize the values
     for categorical_feature_column in categorical_feature_column_list:
-        combined_file_content[categorical_feature_column] = LabelEncoder().fit_transform(combined_file_content[categorical_feature_column])
-    categorical_feature_array = OneHotEncoder(dtype=np.bool, sparse=False).fit_transform(combined_file_content[categorical_feature_column_list])
-    combined_file_content.drop(categorical_feature_column_list, axis=1, inplace=True)
-
-    # Process continuous features
-    combined_file_content[continuous_feature_column_list] = StandardScaler().fit_transform(combined_file_content[continuous_feature_column_list])
-    continuous_feature_array = combined_file_content[continuous_feature_column_list].as_matrix()
-    combined_file_content.drop(continuous_feature_column_list, axis=1, inplace=True)
-
-    # Combine categorical and continuous features
-    X_array = np.hstack((categorical_feature_array, continuous_feature_array)).astype(np.float32)
-    Y_array = combined_file_content[LABEL_COLUMN_NAME].as_matrix()
-    ID_array = combined_file_content[ID_COLUMN_NAME].as_matrix()
-    del(categorical_feature_array, continuous_feature_array)
+        unique_train_data_array = combined_file_content[categorical_feature_column][train_data_mask].unique()
+        unique_test_data_array = combined_file_content[categorical_feature_column][test_data_mask].unique()
+        unique_data_array_to_discard = np.setdiff1d(np.union1d(unique_train_data_array, unique_test_data_array),
+                                                    np.intersect1d(unique_train_data_array, unique_test_data_array))
+        if len(unique_data_array_to_discard) > 0:
+            discard_function = lambda input_value: np.nan if input_value in unique_data_array_to_discard else input_value
+            combined_file_content[categorical_feature_column] = combined_file_content[categorical_feature_column].apply(discard_function)
+        combined_file_content[categorical_feature_column], _ = pd.factorize(combined_file_content[categorical_feature_column])
+        combined_file_content[categorical_feature_column] -= np.min(combined_file_content[categorical_feature_column])
 
     # Separate the training and testing data set
-    test_data_mask = np.isnan(Y_array)
-    train_data_mask = np.logical_not(test_data_mask)
+    X_array = combined_file_content.drop([ID_COLUMN_NAME, LABEL_COLUMN_NAME], axis=1).as_matrix()
+    Y_array = combined_file_content[LABEL_COLUMN_NAME].as_matrix()
+    ID_array = combined_file_content[ID_COLUMN_NAME].as_matrix()
     X_train = X_array[train_data_mask]
     Y_train = Y_array[train_data_mask]
     X_test = X_array[test_data_mask]
@@ -72,26 +58,6 @@ def load_data():
     submission_file_content = pd.DataFrame({ID_COLUMN_NAME:ID_test, LABEL_COLUMN_NAME:np.zeros(ID_test.shape[0])})
 
     return X_train, Y_train, X_test, submission_file_content
-
-def init_model(feature_dim):
-    model = Sequential()
-
-    for block_index in range(BLOCK_NUM):
-        if block_index == 0:
-            model.add(Dense(DENSE_DIM, input_dim=feature_dim))
-        else:
-            model.add(Dense(DENSE_DIM))
-
-        model.add(PReLU())
-        model.add(BatchNormalization())
-        model.add(Dropout(DROPOUT_RATIO))
-
-    model.add(Dense(1))
-
-    optimizer = Adam(lr=0.001, decay=1e-6)
-    model.compile(loss="mean_absolute_error", optimizer=optimizer)
-
-    return model
 
 def ensemble_predictions():
     def _ensemble_predictions(ensemble_func, ensemble_submission_file_name):
@@ -118,44 +84,42 @@ def ensemble_predictions():
 def run():
     # Load data set
     X_train, Y_train, X_test, submission_file_content = load_data()
-
-    # Initiate model
-    model = init_model(X_train.shape[1])
-    vanilla_weights = model.get_weights()
+    Y_train = np.log(Y_train + 200)
 
     # Cross validation
-    cross_validation_iterator = ShuffleSplit(n_splits=CROSS_VALIDATION_NUM, test_size=0.2, random_state=0)
+    cross_validation_iterator = ShuffleSplit(n_splits=CROSS_VALIDATION_NUM, test_size=0.1, random_state=0)
     for cross_validation_index, (train_index, valid_index) in enumerate(cross_validation_iterator.split(X_train), start=1):
         print("Working on {}/{} ...".format(cross_validation_index, CROSS_VALIDATION_NUM))
 
-        optimal_weights_path = "/tmp/Optimal_Weights_{}.h5".format(cross_validation_index)
         submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "submission_{}.csv".format(cross_validation_index))
 
         if os.path.isfile(submission_file_path):
             continue
 
-        if not os.path.isfile(optimal_weights_path):
-            # Load the vanilla weights
-            model.set_weights(vanilla_weights)
+        model = GBMRegressor(
+            learning_rate=0.01,
+            num_iterations=NUM_ITERATIONS,
+            num_leaves=200,
+            min_data_in_leaf=10,
+            feature_fraction=0.3,
+            feature_fraction_seed=cross_validation_index,
+            bagging_fraction=0.8,
+            bagging_freq=10,
+            bagging_seed=cross_validation_index,
+            metric="l1",
+            metric_freq=10,
+            early_stopping_round=EARLY_STOPPING_ROUND,
+            num_threads=-1)
 
-            # Perform the training procedure
-            earlystopping_callback = EarlyStopping(monitor="val_loss", patience=EARLYSTOPPING_PATIENCE)
-            modelcheckpoint_callback = ModelCheckpoint(optimal_weights_path, monitor="val_loss", save_best_only=True)
-            model.fit(X_train[train_index], Y_train[train_index],
-                            batch_size=TRAIN_BATCH_SIZE, nb_epoch=MAXIMUM_EPOCH_NUM,
-                            validation_data=(X_train[valid_index], Y_train[valid_index]),
-                            callbacks=[earlystopping_callback, modelcheckpoint_callback], verbose=2)
-
-        # Load the optimal weights
-        model.load_weights(optimal_weights_path)
+        model.fit(X_train[train_index], Y_train[train_index], test_data=[(X_train[valid_index], Y_train[valid_index])])
 
         # Perform the testing procedure
-        Y_test = model.predict(X_test, batch_size=TEST_BATCH_SIZE, verbose=2)
+        Y_test = model.predict(X_test)
 
         # Save submission to disk
         if not os.path.isdir(SUBMISSION_FOLDER_PATH):
             os.makedirs(SUBMISSION_FOLDER_PATH)
-        submission_file_content[LABEL_COLUMN_NAME] = Y_test
+        submission_file_content[LABEL_COLUMN_NAME] = np.exp(Y_test) - 200
         submission_file_content.to_csv(submission_file_path, index=False)
 
     # Perform ensembling
