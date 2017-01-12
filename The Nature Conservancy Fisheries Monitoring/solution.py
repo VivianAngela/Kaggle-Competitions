@@ -96,6 +96,8 @@ def init_model(unique_label_num, FC_block_num=2, FC_feature_dim=512, dropout_rat
 
     # Convolutional blocks
     pretrained_model = VGG16(include_top=False, weights="imagenet")
+    for layer in pretrained_model.layers:
+        layer.trainable = False
     output_tensor = pretrained_model(input_tensor)
 
     # FullyConnected blocks
