@@ -4,19 +4,14 @@ import shutil
 import numpy as np
 import pandas as pd
 from itertools import product
-from keras import backend as K
-from keras.applications.vgg16 import VGG16, TH_WEIGHTS_PATH_NO_TOP
+from keras.applications.vgg16 import VGG16
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.layers import Dense, Dropout, Flatten, Input
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.preprocessing.image import ImageDataGenerator
-from keras.utils.data_utils import get_file
 from sklearn.model_selection import StratifiedShuffleSplit
-
-# Use theano backend and ordering explicitly
-assert K.backend() == "theano" and K.image_dim_ordering() == "th"
 
 # Dataset
 DATASET_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset/The Nature Conservancy Fisheries Monitoring")
@@ -36,8 +31,7 @@ IMAGE_COLUMN_SIZE = 224
 # Training and Testing procedure
 MAXIMUM_EPOCH_NUM = 1000000
 PATIENCE = 5
-TRAIN_BATCH_SIZE = 32
-TEST_BATCH_SIZE = TRAIN_BATCH_SIZE
+BATCH_SIZE = 32
 
 def load_dataset():
     # Get the labels
@@ -71,7 +65,7 @@ def load_dataset():
         target_size=(IMAGE_ROW_SIZE, IMAGE_COLUMN_SIZE),
         classes=unique_label_list,
         class_mode="categorical",
-        batch_size=TRAIN_BATCH_SIZE,
+        batch_size=BATCH_SIZE,
         shuffle=True)
 
     # Get the generator of the validation dataset
@@ -81,7 +75,7 @@ def load_dataset():
         target_size=(IMAGE_ROW_SIZE, IMAGE_COLUMN_SIZE),
         classes=unique_label_list,
         class_mode="categorical",
-        batch_size=TEST_BATCH_SIZE,
+        batch_size=BATCH_SIZE,
         shuffle=False)
 
     # Get the generator of the testing dataset
@@ -91,7 +85,7 @@ def load_dataset():
         target_size=(IMAGE_ROW_SIZE, IMAGE_COLUMN_SIZE),
         classes=None,
         class_mode=None,
-        batch_size=TEST_BATCH_SIZE,
+        batch_size=BATCH_SIZE,
         shuffle=False)
 
     return train_generator, valid_generator, test_generator, unique_label_list
@@ -101,7 +95,7 @@ def init_model(unique_label_num, FC_block_num=2, FC_feature_dim=512, dropout_rat
     input_tensor = Input(shape=(3, IMAGE_ROW_SIZE, IMAGE_COLUMN_SIZE))
 
     # Convolutional blocks
-    pretrained_model = VGG16(include_top=False, weights=None)
+    pretrained_model = VGG16(include_top=False, weights="imagenet")
     output_tensor = pretrained_model(input_tensor)
 
     # FullyConnected blocks
@@ -115,10 +109,6 @@ def init_model(unique_label_num, FC_block_num=2, FC_feature_dim=512, dropout_rat
     # Define and compile the model
     model = Model(input_tensor, output_tensor)
     model.compile(optimizer=Adam(lr=learning_rate), loss="categorical_crossentropy", metrics=["accuracy"])
-
-    # Load the pretrained weights
-    pretrained_weights_file_path = get_file(TH_WEIGHTS_PATH_NO_TOP.split("/")[-1], TH_WEIGHTS_PATH_NO_TOP, cache_subdir="models")
-    pretrained_model.load_weights(pretrained_weights_file_path)
 
     return model
 
