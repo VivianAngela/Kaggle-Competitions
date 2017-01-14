@@ -56,7 +56,7 @@ def perform_CV(image_path_list, resized_image_row_size=int(IMAGE_ROW_SIZE / 4), 
         image_content_array = np.array([(image_content - image_content.mean()) / image_content.std() for image_content in image_content_array], dtype=np.float32)
 
         print("Apply clustering ...")
-        cluster_ID_array = DBSCAN(eps=1.5 * resized_image_row_size * resized_image_column_size, metric="l1", n_jobs=-1).fit_predict(image_content_array)
+        cluster_ID_array = DBSCAN(eps=1.5 * resized_image_row_size * resized_image_column_size, min_samples=20, metric="l1", n_jobs=-1).fit_predict(image_content_array)
 
         print("Saving clustering result ...")
         image_name_to_cluster_ID_array = np.transpose(np.vstack(([os.path.basename(image_path) for image_path in image_path_list], cluster_ID_array)))
@@ -75,7 +75,7 @@ def perform_CV(image_path_list, resized_image_row_size=int(IMAGE_ROW_SIZE / 4), 
             os.makedirs(sub_clustering_folder_path)
         os.symlink(image_path, os.path.join(sub_clustering_folder_path, os.path.basename(image_path)))
 
-    cv_object = GroupShuffleSplit(n_splits=10, test_size=0.3, random_state=0)
+    cv_object = GroupShuffleSplit(n_splits=100, test_size=0.3, random_state=0)
     for train_index_array, valid_index_array in cv_object.split(X=np.zeros((len(cluster_ID_array), 1)), groups=cluster_ID_array):
         valid_sample_ratio = len(valid_index_array) / (len(train_index_array) + len(valid_index_array))
         if valid_sample_ratio > 0.15 and valid_sample_ratio < 0.25:
