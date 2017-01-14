@@ -164,13 +164,15 @@ class Generator(object):
     def horizontal_flip(self, img, y):
         if np.random.random() < self.hflip_prob:
             img = img[:, ::-1]
-            y[:, [0, 2]] = 1 - y[:, [2, 0]]
+            if len(y) > 0:
+                y[:, [0, 2]] = 1 - y[:, [2, 0]]
         return img, y
 
     def vertical_flip(self, img, y):
         if np.random.random() < self.vflip_prob:
             img = img[::-1]
-            y[:, [1, 3]] = 1 - y[:, [3, 1]]
+            if len(y) > 0:
+                y[:, [1, 3]] = 1 - y[:, [3, 1]]
         return img, y
 
     def random_sized_crop(self, img, targets):
@@ -234,9 +236,9 @@ class Generator(object):
             inputs = []
             targets = []
             for key in keys:
-                img_path = self.path_prefix + key
+                img_path = os.path.join(self.path_prefix, key)
                 img = imread(img_path).astype("float32")
-                y = self.gt[key].copy()
+                y = np.array(self.gt[key].copy())
                 if train and self.do_crop:
                     img, y = self.random_sized_crop(img, y)
                 img = imresize(img, self.image_size).astype("float32")
@@ -296,7 +298,7 @@ def load_dataset():
         with open(annotation_file_path) as annotation_file:
             annotation_file_content = json.load(annotation_file)
             for item in annotation_file_content:
-                key = item["filename"]
+                key = os.path.basename(item["filename"])
                 value = []
                 height, width, _ = image_name_to_image_shape_dict[key]
                 for annotation in item["annotations"]:
