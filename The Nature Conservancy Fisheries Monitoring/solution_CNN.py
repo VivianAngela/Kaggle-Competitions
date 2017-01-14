@@ -11,9 +11,8 @@ from keras.models import Model
 from keras.optimizers import Adam
 from keras.preprocessing.image import ImageDataGenerator
 from skimage.io import imread
-from skimage.transform import resize
-from sklearn.cluster import DBSCAN
 from sklearn.model_selection import GroupShuffleSplit
+from sklearn.preprocessing import LabelEncoder
 
 # Dataset
 DATASET_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset/The Nature Conservancy Fisheries Monitoring")
@@ -43,20 +42,16 @@ MAXIMUM_EPOCH_NUM = 1000000
 PATIENCE = 5
 BATCH_SIZE = 32
 
-def perform_CV(image_path_list, resized_image_row_size=int(IMAGE_ROW_SIZE / 4), resized_image_column_size=int(IMAGE_COLUMN_SIZE / 4)):
+def perform_CV(image_path_list):
     if os.path.isfile(CLUSTERING_RESULT_FILE_PATH):
         print("Loading clustering result ...")
         image_name_to_cluster_ID_array = np.load(CLUSTERING_RESULT_FILE_PATH)
         image_name_to_cluster_ID_dict = dict(image_name_to_cluster_ID_array)
         cluster_ID_array = np.array([image_name_to_cluster_ID_dict[os.path.basename(image_path)] for image_path in image_path_list], dtype=np.int)
     else:
-        print("Reading image content ...")
-        image_content_array = np.array([resize(imread(image_path), (resized_image_row_size, resized_image_column_size), preserve_range=True) for image_path in image_path_list], dtype=np.uint8)
-        image_content_array = np.reshape(image_content_array, (len(image_content_array), -1))
-        image_content_array = np.array([(image_content - image_content.mean()) / image_content.std() for image_content in image_content_array], dtype=np.float32)
-
-        print("Apply clustering ...")
-        cluster_ID_array = DBSCAN(eps=1.5 * resized_image_row_size * resized_image_column_size, min_samples=20, metric="l1", n_jobs=-1).fit_predict(image_content_array)
+        print("Retrieving image shape ...")
+        image_shape_in_str_list = [str(imread(image_path).shape) for image_path in image_path_list]
+        cluster_ID_array = LabelEncoder().fit_transform(image_shape_in_str_list)
 
         print("Saving clustering result ...")
         image_name_to_cluster_ID_array = np.transpose(np.vstack(([os.path.basename(image_path) for image_path in image_path_list], cluster_ID_array)))
@@ -75,14 +70,11 @@ def perform_CV(image_path_list, resized_image_row_size=int(IMAGE_ROW_SIZE / 4), 
             os.makedirs(sub_clustering_folder_path)
         os.symlink(image_path, os.path.join(sub_clustering_folder_path, os.path.basename(image_path)))
 
-    cv_object = GroupShuffleSplit(n_splits=100, test_size=0.3, random_state=0)
+    cv_object = GroupShuffleSplit(n_splits=100, test_size=0.2, random_state=0)
     for train_index_array, valid_index_array in cv_object.split(X=np.zeros((len(cluster_ID_array), 1)), groups=cluster_ID_array):
         valid_sample_ratio = len(valid_index_array) / (len(train_index_array) + len(valid_index_array))
         if valid_sample_ratio > 0.15 and valid_sample_ratio < 0.25:
-            train_unique_label_num = len(np.unique([image_path.split("/")[-2] for image_path in np.array(image_path_list)[train_index_array]]))
-            valid_unique_label_num = len(np.unique([image_path.split("/")[-2] for image_path in np.array(image_path_list)[valid_index_array]]))
-            if  train_unique_label_num == valid_unique_label_num:
-                return train_index_array, valid_index_array
+            return train_index_array, valid_index_array
 
     assert False
 
