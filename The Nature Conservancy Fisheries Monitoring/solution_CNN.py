@@ -10,7 +10,7 @@ from keras.layers.normalization import BatchNormalization
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.preprocessing.image import ImageDataGenerator
-from skimage.io import imread
+from scipy.misc import imread
 from sklearn.model_selection import GroupShuffleSplit
 from sklearn.preprocessing import LabelEncoder
 
@@ -18,7 +18,7 @@ from sklearn.preprocessing import LabelEncoder
 DATASET_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset/The Nature Conservancy Fisheries Monitoring")
 TRAIN_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "train")
 TEST_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "test_stg1")
-CLUSTERING_RESULT_FILE_PATH = os.path.join(DATASET_FOLDER_PATH, "clustering_result.npy")
+RESOLUTION_RESULT_FILE_PATH = os.path.join(DATASET_FOLDER_PATH, "resolution_result.npy")
 
 # Workspace
 WORKSPACE_FOLDER_PATH = os.path.join("/tmp", os.path.basename(DATASET_FOLDER_PATH))
@@ -43,19 +43,21 @@ PATIENCE = 5
 BATCH_SIZE = 32
 
 def perform_CV(image_path_list):
-    if os.path.isfile(CLUSTERING_RESULT_FILE_PATH):
-        print("Loading clustering result ...")
-        image_name_to_cluster_ID_array = np.load(CLUSTERING_RESULT_FILE_PATH)
-        image_name_to_cluster_ID_dict = dict(image_name_to_cluster_ID_array)
-        cluster_ID_array = np.array([image_name_to_cluster_ID_dict[os.path.basename(image_path)] for image_path in image_path_list], dtype=np.int)
+    if os.path.isfile(RESOLUTION_RESULT_FILE_PATH):
+        print("Loading resolution result ...")
+        image_name_with_image_shape_array = np.load(RESOLUTION_RESULT_FILE_PATH)
     else:
         print("Retrieving image shape ...")
-        image_shape_in_str_list = [str(imread(image_path).shape) for image_path in image_path_list]
-        cluster_ID_array = LabelEncoder().fit_transform(image_shape_in_str_list)
+        image_shape_array = np.array([imread(image_path).shape for image_path in image_path_list])
 
-        print("Saving clustering result ...")
-        image_name_to_cluster_ID_array = np.transpose(np.vstack(([os.path.basename(image_path) for image_path in image_path_list], cluster_ID_array)))
-        np.save(CLUSTERING_RESULT_FILE_PATH, image_name_to_cluster_ID_array)
+        print("Saving resolution result ...")
+        image_name_with_image_shape_array = np.hstack((np.expand_dims([os.path.basename(image_path) for image_path in image_path_list], axis=-1), image_shape_array))
+        np.save(RESOLUTION_RESULT_FILE_PATH, image_name_with_image_shape_array)
+
+    print("Performing clustering ...")
+    image_name_to_cluster_ID_dict = dict(zip(image_name_with_image_shape_array[:, 0],
+                LabelEncoder().fit_transform([str(image_name_with_image_shape[1:]) for image_name_with_image_shape in image_name_with_image_shape_array])))
+    cluster_ID_array = np.array([image_name_to_cluster_ID_dict[os.path.basename(image_path)] for image_path in image_path_list], dtype=np.int)
 
     print("The ID value and count are as follows:")
     cluster_ID_values, cluster_ID_counts = np.unique(cluster_ID_array, return_counts=True)
