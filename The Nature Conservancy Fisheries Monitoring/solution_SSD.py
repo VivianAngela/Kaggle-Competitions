@@ -35,9 +35,6 @@ DEFAULT_BOXES_FILE_PATH = os.path.join(SSD_FOLDER_PATH, "prior_boxes_ssd300.pkl"
 # Workspace
 WORKSPACE_FOLDER_PATH = os.path.join("/tmp", os.path.basename(DATASET_FOLDER_PATH))
 CLUSTERING_FOLDER_PATH = os.path.join(WORKSPACE_FOLDER_PATH, "clustering")
-ACTUAL_DATASET_FOLDER_PATH = os.path.join(WORKSPACE_FOLDER_PATH, "actual_dataset")
-ACTUAL_TRAIN_AND_VALID_FOLDER_PATH = os.path.join(ACTUAL_DATASET_FOLDER_PATH, "train_and_valid")
-ACTUAL_TEST_FOLDER_PATH = os.path.join(ACTUAL_DATASET_FOLDER_PATH, "test")
 
 # Output
 OUTPUT_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "{}_output".format(os.path.basename(__file__).split(".")[0]))
@@ -92,28 +89,25 @@ def perform_CV(image_path_list):
 
     assert False
 
-class Generator(object):
+class DataGenerator(object):
     def __init__(self, gt, bbox_util,
-                 batch_size, path_prefix,
-                 train_keys, val_keys, image_size,
+                 image_size,
+                 train_image_path_list, valid_image_path_list, test_image_path_list,
                  saturation_var=0.5,
                  brightness_var=0.5,
                  contrast_var=0.5,
                  lighting_std=0.5,
                  hflip_prob=0.5,
                  vflip_prob=0.5,
-                 do_crop=True,
+                 do_crop=False,
                  crop_area_range=[0.75, 1.0],
                  aspect_ratio_range=[3. / 4., 4. / 3.]):
         self.gt = gt
         self.bbox_util = bbox_util
-        self.batch_size = batch_size
-        self.path_prefix = path_prefix
-        self.train_keys = train_keys
-        self.val_keys = val_keys
-        self.train_batches = len(train_keys)
-        self.val_batches = len(val_keys)
         self.image_size = image_size
+        self.train_image_path_list = train_image_path_list
+        self.valid_image_path_list = valid_image_path_list
+        self.test_image_path_list = test_image_path_list
         self.color_jitter = []
         if saturation_var:
             self.saturation_var = saturation_var
@@ -224,23 +218,27 @@ class Generator(object):
             new_targets = np.asarray(new_targets).reshape(-1, targets.shape[1])
             return img, new_targets
 
-    def generate(self, train=True):
+    def generate(self, dataset_name="train", batch_size=BATCH_SIZE):
         np.random.seed(0)
         while True:
-            if train:
-                keys = np.random.permutation(self.train_keys)
+            if dataset_name == "train":
+                image_path_list = np.random.permutation(self.train_image_path_list)
+            elif dataset_name == "valid":
+                image_path_list = self.valid_image_path_list
+            elif dataset_name == "test":
+                image_path_list = self.test_image_path_list
             else:
-                keys = np.random.permutation(self.val_keys)
+                assert False
             inputs = []
             targets = []
-            for key in keys:
-                img_path = os.path.join(self.path_prefix, key)
-                img = imread(img_path)
-                y = np.array(self.gt[key].copy())
-                if train and self.do_crop:
+            for (image_index, image_path) in enumerate(image_path_list, start=1):
+                img = imread(image_path)
+                if dataset_name != "test":
+                    y = np.array(self.gt[image_path].copy())
+                if dataset_name == "train" and self.do_crop:
                     img, y = self.random_sized_crop(img, y)
                 img = resize(img, self.image_size, preserve_range=True).astype("float32")
-                if train:
+                if dataset_name == "train":
                     for jitter in np.random.permutation(self.color_jitter):
                         img = jitter(img)
                     if self.lighting_std:
@@ -249,16 +247,18 @@ class Generator(object):
                         img, y = self.horizontal_flip(img, y)
                     if self.vflip_prob > 0:
                         img, y = self.vertical_flip(img, y)
-                y = self.bbox_util.assign_boxes(y)
                 inputs.append(img)
-                targets.append(y)
-                if len(targets) == self.batch_size:
-                    # TODO: Fix warning
+                if dataset_name != "test":
+                    targets.append(self.bbox_util.assign_boxes(y))
+                if len(inputs) == batch_size or image_index == len(image_path_list):
                     tmp_inp = np.array(inputs)
                     tmp_targets = np.array(targets)
                     inputs = []
                     targets = []
-                    yield preprocess_input(tmp_inp), tmp_targets
+                    if dataset_name != "test":
+                        yield preprocess_input(tmp_inp), tmp_targets
+                    else:
+                        yield preprocess_input(tmp_inp)
 
 def load_dataset():
     # Get the labels
@@ -268,18 +268,10 @@ def load_dataset():
 
     # Cross validation
     whole_train_image_path_list = glob.glob(os.path.join(TRAIN_FOLDER_PATH, "*/*.jpg"))
-    whole_train_image_name_list = [os.path.basename(image_path) for image_path in whole_train_image_path_list]
     train_index_array, valid_index_array = perform_CV(whole_train_image_path_list)
-    train_image_name_array = np.array(whole_train_image_name_list)[train_index_array]
-    valid_image_name_array = np.array(whole_train_image_name_list)[valid_index_array]
-
-    # Create symbolic links
-    shutil.rmtree(ACTUAL_DATASET_FOLDER_PATH, ignore_errors=True)
-    os.makedirs(ACTUAL_TRAIN_AND_VALID_FOLDER_PATH)
-    for image_path in whole_train_image_path_list:
-        os.symlink(image_path, os.path.join(ACTUAL_TRAIN_AND_VALID_FOLDER_PATH, os.path.basename(image_path)))
-    os.makedirs(ACTUAL_TEST_FOLDER_PATH)
-    os.symlink(TEST_FOLDER_PATH, os.path.join(ACTUAL_TEST_FOLDER_PATH, "dummy"))
+    train_image_path_array = np.array(whole_train_image_path_list)[train_index_array]
+    valid_image_path_array = np.array(whole_train_image_path_list)[valid_index_array]
+    test_image_path_list = glob.glob(os.path.join(TEST_FOLDER_PATH, "*.jpg"))
 
     # Load resolution result
     assert os.path.isfile(RESOLUTION_RESULT_FILE_PATH)
@@ -321,9 +313,10 @@ def load_dataset():
     bbox_utility = BBoxUtility(num_classes=len(unique_label_list), priors=np.load(DEFAULT_BOXES_FILE_PATH))
 
     # Construct generator
-    generator = Generator(annotation_dict, bbox_utility, BATCH_SIZE, ACTUAL_TRAIN_AND_VALID_FOLDER_PATH, train_image_name_array, valid_image_name_array, (IMAGE_ROW_SIZE, IMAGE_COLUMN_SIZE), do_crop=False)
+    data_generator = DataGenerator(annotation_dict, bbox_utility, (IMAGE_ROW_SIZE, IMAGE_COLUMN_SIZE),
+                                train_image_path_array.tolist(), valid_image_path_array.tolist(), test_image_path_list)
 
-    return generator, unique_label_list, unique_label_with_object_list, bbox_utility
+    return data_generator, unique_label_list, unique_label_with_object_list, bbox_utility
 
 def init_model(unique_label_num, learning_rate=0.0003):
     # Init model
@@ -358,7 +351,7 @@ def illustrate(image_path_list, model, bbox_utility, unique_label_with_object_li
 
     # Generate output
     input_array = preprocess_input(np.array(input_array))
-    output_array = model.predict(input_array, batch_size=1, verbose=2)
+    output_array = model.predict(input_array, batch_size=BATCH_SIZE, verbose=2)
     converted_output_list = bbox_utility.detection_out(output_array)
 
     # Create figures
@@ -392,7 +385,7 @@ def illustrate(image_path_list, model, bbox_utility, unique_label_with_object_li
 
 def run():
     print("Loading dataset ...")
-    generator, unique_label_list, unique_label_with_object_list, bbox_utility = load_dataset()
+    data_generator, unique_label_list, unique_label_with_object_list, bbox_utility = load_dataset()
 
     print("Initializing model ...")
     model = init_model(unique_label_num=len(unique_label_list))
@@ -405,10 +398,10 @@ def run():
         print("Performing the training procedure ...")
         earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
         modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_PATH, monitor="val_loss", save_best_only=True)
-        model.fit_generator(generator=generator.generate(False),
-                            samples_per_epoch=generator.train_batches,
-                            validation_data=generator.generate(False),
-                            nb_val_samples=generator.val_batches,
+        model.fit_generator(generator=data_generator.generate(dataset_name="train"),
+                            samples_per_epoch=len(data_generator.train_image_path_list),
+                            validation_data=data_generator.generate(dataset_name="valid"),
+                            nb_val_samples=len(data_generator.valid_image_path_list),
                             callbacks=[earlystopping_callback, modelcheckpoint_callback],
                             nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
 
@@ -416,11 +409,13 @@ def run():
     model.load_weights(OPTIMAL_WEIGHTS_FILE_PATH)
 
     print("Illustrating predictions ...")
-    selected_valid_image_path_list = [os.path.join(generator.path_prefix, image_name) for image_name in np.random.choice(generator.val_keys, BATCH_SIZE, replace=False)]
-    illustrate(selected_valid_image_path_list, model, bbox_utility, unique_label_with_object_list)
+    selected_image_path_list = np.random.choice(data_generator.valid_image_path_list, BATCH_SIZE, replace=False).tolist()
+    illustrate(selected_image_path_list, model, bbox_utility, unique_label_with_object_list)
 
     if not os.path.isfile(SUBMISSION_FILE_PATH):
         print("Performing the testing procedure ...")
+        prediction_array = model.predict_generator(generator=data_generator.generate(dataset_name="test"), val_samples=len(data_generator.test_image_path_list))
+        converted_output_list = bbox_utility.detection_out(prediction_array)
         # TODO: Generate submission file
 
     print("All done!")
