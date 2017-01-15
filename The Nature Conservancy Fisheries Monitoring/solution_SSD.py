@@ -3,12 +3,12 @@ import glob
 import shutil
 import json
 import numpy as np
-from random import shuffle
 from keras import backend as K
 from keras.applications.imagenet_utils import preprocess_input
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.optimizers import Adam
-from scipy.misc import imread, imresize
+from skimage.io import imread
+from skimage.transform import resize
 from sklearn.model_selection import GroupShuffleSplit
 from sklearn.preprocessing import LabelEncoder
 from SSD_related.ssd import SSD300
@@ -164,15 +164,13 @@ class Generator(object):
     def horizontal_flip(self, img, y):
         if np.random.random() < self.hflip_prob:
             img = img[:, ::-1]
-            if len(y) > 0:
-                y[:, [0, 2]] = 1 - y[:, [2, 0]]
+            y[:, [0, 2]] = 1 - y[:, [2, 0]]
         return img, y
 
     def vertical_flip(self, img, y):
         if np.random.random() < self.vflip_prob:
             img = img[::-1]
-            if len(y) > 0:
-                y[:, [1, 3]] = 1 - y[:, [3, 1]]
+            y[:, [1, 3]] = 1 - y[:, [3, 1]]
         return img, y
 
     def random_sized_crop(self, img, targets):
@@ -226,25 +224,23 @@ class Generator(object):
             return img, new_targets
 
     def generate(self, train=True):
+        np.random.seed(0)
         while True:
             if train:
-                shuffle(self.train_keys)
-                keys = self.train_keys
+                keys = np.random.permutation(self.train_keys)
             else:
-                shuffle(self.val_keys)
-                keys = self.val_keys
+                keys = np.random.permutation(self.val_keys)
             inputs = []
             targets = []
             for key in keys:
                 img_path = os.path.join(self.path_prefix, key)
-                img = imread(img_path).astype("float32")
+                img = imread(img_path)
                 y = np.array(self.gt[key].copy())
                 if train and self.do_crop:
                     img, y = self.random_sized_crop(img, y)
-                img = imresize(img, self.image_size).astype("float32")
+                img = resize(img, self.image_size, preserve_range=True).astype("float32")
                 if train:
-                    shuffle(self.color_jitter)
-                    for jitter in self.color_jitter:
+                    for jitter in np.random.permutation(self.color_jitter):
                         img = jitter(img)
                     if self.lighting_std:
                         img = self.lighting(img)
@@ -324,7 +320,7 @@ def load_dataset():
     # Construct generator
     generator = Generator(annotation_dict, bbox_utility, BATCH_SIZE, ACTUAL_TRAIN_AND_VALID_FOLDER_PATH, train_image_name_array, valid_image_name_array, (IMAGE_ROW_SIZE, IMAGE_COLUMN_SIZE), do_crop=False)
 
-    return generator, unique_label_list, unique_label_with_object_list
+    return generator, unique_label_list, unique_label_with_object_list, bbox_utility
 
 def init_model(unique_label_num, learning_rate=0.0003):
     # Init model
@@ -346,7 +342,7 @@ def init_model(unique_label_num, learning_rate=0.0003):
 
 def run():
     print("Loading dataset ...")
-    generator, unique_label_list, unique_label_with_object_list = load_dataset()
+    generator, unique_label_list, unique_label_with_object_list, bbox_utility = load_dataset()
 
     print("Initializing model ...")
     model = init_model(unique_label_num=len(unique_label_list))
@@ -359,7 +355,7 @@ def run():
         print("Performing the training procedure ...")
         earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
         modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_PATH, monitor="val_loss", save_best_only=True)
-        model.fit_generator(generator=generator.generate(True),
+        model.fit_generator(generator=generator.generate(False),
                             samples_per_epoch=generator.train_batches,
                             validation_data=generator.generate(False),
                             nb_val_samples=generator.val_batches,
