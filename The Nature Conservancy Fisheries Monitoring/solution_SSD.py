@@ -25,6 +25,7 @@ TRAIN_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "train")
 TEST_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "test_stg1")
 ANNOTATION_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "annotations")
 RESOLUTION_RESULT_FILE_PATH = os.path.join(DATASET_FOLDER_PATH, "resolution_result.npy")
+VALID_IMAGE_NAME_FILE_PATH = os.path.join(DATASET_FOLDER_PATH, "valid_image_name.npy")
 LABEL_WITHOUT_OBJECT = "NoF"
 
 # SSD: Single Shot MultiBox Detector
@@ -64,9 +65,10 @@ def perform_CV(image_path_list):
         np.save(RESOLUTION_RESULT_FILE_PATH, image_name_with_image_shape_array)
 
     print("Performing clustering ...")
+    image_name_list = [os.path.basename(image_path) for image_path in image_path_list]
     image_name_to_cluster_ID_dict = dict(zip(image_name_with_image_shape_array[:, 0],
                 LabelEncoder().fit_transform([str(image_name_with_image_shape[1:]) for image_name_with_image_shape in image_name_with_image_shape_array])))
-    cluster_ID_array = np.array([image_name_to_cluster_ID_dict[os.path.basename(image_path)] for image_path in image_path_list], dtype=np.int)
+    cluster_ID_array = np.array([image_name_to_cluster_ID_dict[image_name] for image_name in image_name_list], dtype=np.int)
 
     print("The ID value and count are as follows:")
     cluster_ID_values, cluster_ID_counts = np.unique(cluster_ID_array, return_counts=True)
@@ -81,11 +83,26 @@ def perform_CV(image_path_list):
             os.makedirs(sub_clustering_folder_path)
         os.symlink(image_path, os.path.join(sub_clustering_folder_path, os.path.basename(image_path)))
 
-    cv_object = GroupShuffleSplit(n_splits=100, test_size=0.2, random_state=0)
-    for train_index_array, valid_index_array in cv_object.split(X=np.zeros((len(cluster_ID_array), 1)), groups=cluster_ID_array):
-        valid_sample_ratio = len(valid_index_array) / (len(train_index_array) + len(valid_index_array))
-        if valid_sample_ratio > 0.15 and valid_sample_ratio < 0.25:
-            return train_index_array, valid_index_array
+    if os.path.isfile(VALID_IMAGE_NAME_FILE_PATH):
+        print("Loading valid image name ...")
+        valid_image_name_array = np.load(VALID_IMAGE_NAME_FILE_PATH)
+        valid_index_list = []
+        for (image_index, image_name) in enumerate(image_name_list):
+            if image_name == valid_image_name_array[len(valid_index_list)]:
+                valid_index_list.append(image_index)
+                if len(valid_index_list) == len(valid_image_name_array):
+                    break
+        valid_index_array = np.array(valid_index_list)
+        train_index_array = np.setdiff1d(np.arange(len(image_name_list)), valid_index_array)
+        return train_index_array, valid_index_array
+    else:
+        cv_object = GroupShuffleSplit(n_splits=100, test_size=0.2, random_state=0)
+        for train_index_array, valid_index_array in cv_object.split(X=np.zeros((len(cluster_ID_array), 1)), groups=cluster_ID_array):
+            valid_sample_ratio = len(valid_index_array) / (len(train_index_array) + len(valid_index_array))
+            if valid_sample_ratio > 0.15 and valid_sample_ratio < 0.25:
+                print("Saving valid image name ...")
+                np.save(VALID_IMAGE_NAME_FILE_PATH, np.array(image_name_list)[valid_index_array])
+                return train_index_array, valid_index_array
 
     assert False
 
@@ -267,7 +284,7 @@ def load_dataset():
     unique_label_with_object_list = [unique_label for unique_label in unique_label_list if unique_label != LABEL_WITHOUT_OBJECT]
 
     # Cross validation
-    whole_train_image_path_list = glob.glob(os.path.join(TRAIN_FOLDER_PATH, "*/*.jpg"))
+    whole_train_image_path_list = sorted(glob.glob(os.path.join(TRAIN_FOLDER_PATH, "*/*.jpg")))
     train_index_array, valid_index_array = perform_CV(whole_train_image_path_list)
     train_image_path_array = np.array(whole_train_image_path_list)[train_index_array]
     valid_image_path_array = np.array(whole_train_image_path_list)[valid_index_array]
