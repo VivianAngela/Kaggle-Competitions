@@ -181,9 +181,11 @@ def run():
                             callbacks=[earlystopping_callback, modelcheckpoint_callback],
                             nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
 
+    print("Loading weights at {} ...".format(OPTIMAL_WEIGHTS_FILE_PATH))
+    model.load_weights(OPTIMAL_WEIGHTS_FILE_PATH)
+
     if not os.path.isfile(SUBMISSION_FILE_PATH):
         print("Performing the testing procedure ...")
-        model.load_weights(OPTIMAL_WEIGHTS_FILE_PATH)
         prediction_array = model.predict_generator(generator=test_generator, val_samples=len(test_generator.filenames))
         image_name_array = np.expand_dims([os.path.basename(image_path) for image_path in test_generator.filenames], axis=-1)
         index_array_for_sorting = np.argsort(image_name_array, axis=0)

@@ -3,6 +3,7 @@ import glob
 import shutil
 import json
 import numpy as np
+import matplotlib.pyplot as plt
 from keras import backend as K
 from keras.applications.imagenet_utils import preprocess_input
 from keras.callbacks import EarlyStopping, ModelCheckpoint
@@ -340,6 +341,53 @@ def init_model(unique_label_num, learning_rate=0.0003):
 
     return model
 
+def illustrate(image_path_list, model, bbox_utility, unique_label_with_object_list, confidence_threshold=0.6):
+    # Use different colors for different labels
+    color_array = plt.cm.hsv(np.linspace(0, 1, len(unique_label_with_object_list) + 1))
+
+    # Construct input
+    input_array = []
+    vanilla_image_list = []
+    for image_path in image_path_list:
+        image = imread(image_path)
+        vanilla_image_list.append(image)
+        image = resize(image, (IMAGE_ROW_SIZE, IMAGE_COLUMN_SIZE), preserve_range=True).astype("float32")
+        input_array.append(image)
+
+    # Generate output
+    input_array = preprocess_input(np.array(input_array))
+    output_array = model.predict(input_array, batch_size=1, verbose=2)
+    converted_output_list = bbox_utility.detection_out(output_array)
+
+    # Create figures
+    plt.figure()
+    for (image_index, (image_path, image, converted_output)) in enumerate(zip(image_path_list, vanilla_image_list, converted_output_list), start=1):
+        plt.imshow(image)
+        plt.title("{}/{} {}".format(image_index, len(image_path_list), os.path.basename(image_path)))
+        current_axis = plt.gca()
+
+        height, width, _ = image.shape
+        for (label, confidence, xmin, ymin, xmax, ymax) in converted_output:
+            # Neglect low confidence detections
+            if confidence < confidence_threshold:
+                continue
+
+            label = int(label)
+            xmin_index, xmax_index, ymin_index, ymax_index = np.multiply((xmin, xmax, ymin, ymax), (width, width, height, height)).astype(np.int)
+
+            # Get color for current detection
+            color = color_array[label]
+
+            # Add bounding box
+            coordinate = ((xmin_index, ymin_index), xmax_index - xmin_index + 1, ymax_index - ymin_index + 1)
+            current_axis.add_patch(plt.Rectangle(*coordinate, fill=False, edgecolor=color, linewidth=2))
+
+            # Add text
+            display_text = "{:0.2f}, {}".format(confidence, unique_label_with_object_list[label - 1])
+            current_axis.text(xmin_index, ymin_index, display_text, bbox={"facecolor":color, "alpha":0.5})
+
+        plt.show()
+
 def run():
     print("Loading dataset ...")
     generator, unique_label_list, unique_label_with_object_list, bbox_utility = load_dataset()
@@ -361,6 +409,13 @@ def run():
                             nb_val_samples=generator.val_batches,
                             callbacks=[earlystopping_callback, modelcheckpoint_callback],
                             nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
+
+    print("Loading weights at {} ...".format(OPTIMAL_WEIGHTS_FILE_PATH))
+    model.load_weights(OPTIMAL_WEIGHTS_FILE_PATH)
+
+    print("Illustrating predictions ...")
+    selected_valid_image_path_list = [os.path.join(generator.path_prefix, image_name) for image_name in np.random.choice(generator.val_keys, BATCH_SIZE, replace=False)]
+    illustrate(selected_valid_image_path_list, model, bbox_utility, unique_label_with_object_list)
 
     print("All done!")
 
