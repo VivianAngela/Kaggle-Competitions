@@ -253,6 +253,7 @@ class Generator(object):
                 inputs.append(img)
                 targets.append(y)
                 if len(targets) == self.batch_size:
+                    # TODO: Fix warning
                     tmp_inp = np.array(inputs)
                     tmp_targets = np.array(targets)
                     inputs = []
@@ -299,6 +300,7 @@ def load_dataset():
                 value = []
                 height, width, _ = image_name_to_image_shape_dict[key]
                 for annotation in item["annotations"]:
+                    # TODO: Something is wrong!
                     xmin = annotation["x"] / width
                     xmax = (annotation["x"] + annotation["width"]) / width
                     ymin = 1 - (annotation["y"] + annotation["height"]) / height
@@ -416,6 +418,10 @@ def run():
     print("Illustrating predictions ...")
     selected_valid_image_path_list = [os.path.join(generator.path_prefix, image_name) for image_name in np.random.choice(generator.val_keys, BATCH_SIZE, replace=False)]
     illustrate(selected_valid_image_path_list, model, bbox_utility, unique_label_with_object_list)
+
+    if not os.path.isfile(SUBMISSION_FILE_PATH):
+        print("Performing the testing procedure ...")
+        # TODO: Generate submission file
 
     print("All done!")
 
