@@ -292,11 +292,10 @@ def load_dataset():
                 value = []
                 height, width, _ = image_name_to_image_shape_dict[key]
                 for annotation in item["annotations"]:
-                    # TODO: Something is wrong!
                     xmin = annotation["x"] / width
                     xmax = (annotation["x"] + annotation["width"]) / width
-                    ymin = 1 - (annotation["y"] + annotation["height"]) / height
-                    ymax = 1 - annotation["y"] / height
+                    ymin = annotation["y"] / height
+                    ymax = (annotation["y"] + annotation["height"]) / height
                     coordinate_array = np.clip([xmin, ymin, xmax, ymax], 0, 1)
                     prob_array = np.zeros(len(unique_label_with_object_list))
                     prob_array[unique_label_index] = 1
