@@ -248,10 +248,12 @@ class DataGenerator(object):
                 assert False
             inputs = []
             targets = []
-            for (image_index, image_path) in enumerate(image_path_list, start=1):
+            for image_path in image_path_list:
                 img = imread(image_path)
                 if dataset_name != "test":
-                    y = np.array(self.gt[image_path].copy())
+                    y = np.array(self.gt[os.path.basename(image_path)].copy())
+                    if len(y) == 0:
+                        continue
                 if dataset_name == "train" and self.do_crop:
                     img, y = self.random_sized_crop(img, y)
                 img = resize(img, self.image_size, preserve_range=True).astype("float32")
@@ -267,7 +269,7 @@ class DataGenerator(object):
                 inputs.append(img)
                 if dataset_name != "test":
                     targets.append(self.bbox_util.assign_boxes(y))
-                if len(inputs) == batch_size or image_index == len(image_path_list):
+                if len(inputs) == batch_size:
                     tmp_inp = np.array(inputs)
                     tmp_targets = np.array(targets)
                     inputs = []
@@ -276,6 +278,15 @@ class DataGenerator(object):
                         yield preprocess_input(tmp_inp), tmp_targets
                     else:
                         yield preprocess_input(tmp_inp)
+            if len(inputs) != 0:
+                tmp_inp = np.array(inputs)
+                tmp_targets = np.array(targets)
+                inputs = []
+                targets = []
+                if dataset_name != "test":
+                    yield preprocess_input(tmp_inp), tmp_targets
+                else:
+                    yield preprocess_input(tmp_inp)
 
 def load_dataset():
     # Get the labels
