@@ -121,7 +121,7 @@ def run():
             prediction_array_list.append(prediction_array)
 
             # Save prediction to disk
-            submission_file_content = pd.DataFrame(np.hstack((np.expand_dims(np.arange(len(prediction_array)), axis=-1) + 1, prediction_array)), columns=['GeneId', 'Prediction'])
+            submission_file_content = pd.DataFrame(np.hstack((np.expand_dims(np.arange(len(prediction_array)), axis=-1) + 1, prediction_array)), columns=["GeneId", "Prediction"])
             submission_file_content.GeneId = submission_file_content.GeneId.astype(int)
             submission_file_content.to_csv(submission_file_path, index=False)
             print("Submission saved at {}".format(submission_file_path))
@@ -137,7 +137,7 @@ def run():
             prediction_array = ensemble_func(prediction_array_list, axis=0)
 
             # Save prediction to disk
-            submission_file_content = pd.DataFrame(np.hstack((np.expand_dims(np.arange(len(prediction_array)), axis=-1) + 1, prediction_array)), columns=['GeneId', 'Prediction'])
+            submission_file_content = pd.DataFrame(np.hstack((np.expand_dims(np.arange(len(prediction_array)), axis=-1) + 1, prediction_array)), columns=["GeneId", "Prediction"])
             submission_file_content.GeneId = submission_file_content.GeneId.astype(int)
             submission_file_content.to_csv(submission_file_path, index=False)
             print("Submission saved at {}".format(submission_file_path))
