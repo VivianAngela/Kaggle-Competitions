@@ -2,7 +2,7 @@ import os
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.model_selection import RandomizedSearchCV, StratifiedShuffleSplit
 
 # Dataset
 DATASET_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset/Gene Expression Prediction")
@@ -50,6 +50,22 @@ def run():
 
     print("Loading dataset ...")
     x_train, y_train, x_test = load_dataset()
+
+    print("Performing parameter optimization ...")
+    estimator = lgb.LGBMClassifier()
+    param_grid = {
+        "num_leaves": [31, 63, 127, 255],
+        "learning_rate": [0.01, 0.05, 0.1],
+        "n_estimators": [50, 100, 200],
+        "subsample" : [0.8, 0.9, 1],
+        "colsample_bytree" : [0.8, 0.9, 1],
+        "reg_alpha" : [0, 0.1, 0.5],
+        "objective" : ["binary"]
+    }
+    randomizedsearch_object = RandomizedSearchCV(estimator, param_grid, n_iter=100, cv=5, scoring="roc_auc", refit=False, verbose=3)
+    randomizedsearch_object.fit(x_train, y_train)
+    print("Best score is: {}".format(randomizedsearch_object.best_score_))
+    print("Best parameters are: {}".format(randomizedsearch_object.best_params_))
 
     prediction_array_list = []
     cv_object = StratifiedShuffleSplit(n_splits=100, test_size=0.2, random_state=0)
