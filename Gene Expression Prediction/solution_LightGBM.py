@@ -9,11 +9,6 @@ DATASET_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset/G
 MODEL_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "model")
 SUBMISSION_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "submission")
 
-# The training/testing process
-PARAMS = {"objective":"binary", "metric":"auc"}
-NUM_BOOST_ROUND = 1000000
-EARLY_STOPPING_ROUNDS = 100
-
 def load_dataset():
     # Read csv files
     x_train = pd.read_csv(os.path.join(DATASET_FOLDER_PATH, "train/x_train.csv")).as_matrix()
@@ -52,20 +47,23 @@ def run():
     x_train, y_train, x_test = load_dataset()
 
     print("Performing parameter optimization ...")
-    estimator = lgb.LGBMClassifier()
-    param_grid = {
-        "num_leaves": [31, 63, 127, 255],
-        "learning_rate": [0.01, 0.05, 0.1],
-        "n_estimators": [50, 100, 200],
-        "subsample" : [0.8, 0.9, 1],
-        "colsample_bytree" : [0.8, 0.9, 1],
-        "reg_alpha" : [0, 0.1, 0.5],
-        "objective" : ["binary"]
-    }
-    randomizedsearch_object = RandomizedSearchCV(estimator, param_grid, n_iter=100, cv=5, scoring="roc_auc", refit=False, verbose=3)
-    randomizedsearch_object.fit(x_train, y_train)
-    print("Best score is: {}".format(randomizedsearch_object.best_score_))
-    print("Best parameters are: {}".format(randomizedsearch_object.best_params_))
+    # estimator = lgb.LGBMClassifier()
+    # param_grid = {
+    #     "num_leaves": [31, 63, 127, 255],
+    #     "learning_rate": [0.01, 0.05, 0.1],
+    #     "n_estimators": [50, 100, 200],
+    #     "subsample" : [0.8, 0.9, 1],
+    #     "colsample_bytree" : [0.8, 0.9, 1],
+    #     "reg_alpha" : [0, 0.1, 0.5],
+    #     "objective" : ["binary"]
+    # }
+    # randomizedsearch_object = RandomizedSearchCV(estimator, param_grid, n_iter=100, cv=5, scoring="roc_auc", refit=False, verbose=3)
+    # randomizedsearch_object.fit(x_train, y_train)
+    # print("Best score is: {}".format(randomizedsearch_object.best_score_))
+    # print("Best parameters are: {}".format(randomizedsearch_object.best_params_))
+    # Best score is: 0.9176406673636928
+    # Best parameters are: {'subsample': 0.9, 'reg_alpha': 0, 'objective': 'binary', 'num_leaves': 255, 'n_estimators': 200, 'learning_rate': 0.05, 'colsample_bytree': 0.9}
+    best_params = {"num_leaves": 255, "learning_rate": 0.05, "subsample": 0.9, "colsample_bytree": 0.9, "reg_alpha": 0, "objective":"binary", "metric":"auc"}
 
     prediction_array_list = []
     cv_object = StratifiedShuffleSplit(n_splits=100, test_size=0.2, random_state=0)
@@ -76,7 +74,7 @@ def run():
             if not os.path.isfile(model_file_path):
                 train_data = lgb.Dataset(x_train[train_index], label=y_train[train_index])
                 validation_data = lgb.Dataset(x_train[valid_index], label=y_train[valid_index], reference=train_data)
-                model = lgb.train(params=PARAMS, train_set=train_data, num_boost_round=NUM_BOOST_ROUND, valid_sets=[validation_data], early_stopping_rounds=EARLY_STOPPING_ROUNDS)
+                model = lgb.train(params=best_params, train_set=train_data, num_boost_round=1000000, valid_sets=[validation_data], early_stopping_rounds=100)
                 model.save_model(model_file_path, num_iteration=model.best_iteration)
 
             assert os.path.isfile(model_file_path)
