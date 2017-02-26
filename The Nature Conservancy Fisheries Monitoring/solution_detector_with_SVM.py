@@ -109,10 +109,13 @@ def initiate_annotation():
                 value = []
                 total_height, total_width, _ = image_name_to_image_shape_dict[key]
                 for annotation in item["annotations"]:
-                    xmin = annotation["x"] / total_width
-                    xmax = (annotation["x"] + annotation["width"]) / total_width
-                    ymin = annotation["y"] / total_height
-                    ymax = (annotation["y"] + annotation["height"]) / total_height
+                    xmiddle = (2 * annotation["x"] + annotation["width"]) / 2
+                    ymiddle = (2 * annotation["y"] + annotation["height"]) / 2
+                    half_max_side = max(annotation["width"], annotation["height"]) / 2
+                    xmin = (xmiddle - half_max_side) / total_width
+                    xmax = (xmiddle + half_max_side) / total_width
+                    ymin = (ymiddle - half_max_side) / total_height
+                    ymax = (ymiddle + half_max_side) / total_height
                     xmin, ymin, xmax, ymax = np.clip([xmin, ymin, xmax, ymax], 0, 1)
                     assert xmax > xmin and ymax > ymin
 
@@ -120,8 +123,10 @@ def initiate_annotation():
                     left = xmin * total_width
                     width = (xmax - xmin) * total_width
                     height = (ymax - ymin) * total_height
-                    coordinate_array = np.array((top, left, width, height), dtype=np.uint32)
+                    if width / height > 1.25 or height / width > 1.25:
+                        continue
 
+                    coordinate_array = np.array((top, left, width, height), dtype=np.uint32)
                     value.append(coordinate_array)
                 if key in annotation_dict:
                     assert False, "Found existing key {}!!!".format(key)
