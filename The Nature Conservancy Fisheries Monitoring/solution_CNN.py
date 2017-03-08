@@ -10,15 +10,15 @@ from keras.layers.normalization import BatchNormalization
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.preprocessing.image import ImageDataGenerator
-from scipy.misc import imread
+from scipy.misc import imread, imresize
+from sklearn.cluster import DBSCAN
 from sklearn.model_selection import GroupShuffleSplit
-from sklearn.preprocessing import LabelEncoder
 
 # Dataset
 DATASET_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset/The Nature Conservancy Fisheries Monitoring")
 TRAIN_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "train")
 TEST_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "test_stg1")
-RESOLUTION_RESULT_FILE_PATH = os.path.join(DATASET_FOLDER_PATH, "resolution_result.npy")
+CLUSTERING_RESULT_FILE_PATH = os.path.join(DATASET_FOLDER_PATH, "clustering_result.npy")
 
 # Workspace
 WORKSPACE_FOLDER_PATH = os.path.join("/tmp", os.path.basename(DATASET_FOLDER_PATH))
@@ -42,22 +42,24 @@ MAXIMUM_EPOCH_NUM = 1000000
 PATIENCE = 5
 BATCH_SIZE = 32
 
-def perform_CV(image_path_list):
-    if os.path.isfile(RESOLUTION_RESULT_FILE_PATH):
-        print("Loading resolution result ...")
-        image_name_with_image_shape_array = np.load(RESOLUTION_RESULT_FILE_PATH)
+def perform_CV(image_path_list, resized_image_row_size=64, resized_image_column_size=64):
+    if os.path.isfile(CLUSTERING_RESULT_FILE_PATH):
+        print("Loading clustering result ...")
+        image_name_to_cluster_ID_array = np.load(CLUSTERING_RESULT_FILE_PATH)
+        image_name_to_cluster_ID_dict = dict(image_name_to_cluster_ID_array)
+        cluster_ID_array = np.array([image_name_to_cluster_ID_dict[os.path.basename(image_path)] for image_path in image_path_list], dtype=np.int)
     else:
-        print("Retrieving image shape ...")
-        image_shape_array = np.array([imread(image_path).shape for image_path in image_path_list])
+        print("Reading image content ...")
+        image_content_array = np.array([imresize(imread(image_path), (resized_image_row_size, resized_image_column_size)) for image_path in image_path_list])
+        image_content_array = np.reshape(image_content_array, (len(image_content_array), -1))
+        image_content_array = np.array([(image_content - image_content.mean()) / image_content.std() for image_content in image_content_array], dtype=np.float32)
 
-        print("Saving resolution result ...")
-        image_name_with_image_shape_array = np.hstack((np.expand_dims([os.path.basename(image_path) for image_path in image_path_list], axis=-1), image_shape_array))
-        np.save(RESOLUTION_RESULT_FILE_PATH, image_name_with_image_shape_array)
+        print("Apply clustering ...")
+        cluster_ID_array = DBSCAN(eps=1.5 * resized_image_row_size * resized_image_column_size, min_samples=20, metric="l1", n_jobs=-1).fit_predict(image_content_array)
 
-    print("Performing clustering ...")
-    image_name_to_cluster_ID_dict = dict(zip(image_name_with_image_shape_array[:, 0],
-                LabelEncoder().fit_transform([str(image_name_with_image_shape[1:]) for image_name_with_image_shape in image_name_with_image_shape_array])))
-    cluster_ID_array = np.array([image_name_to_cluster_ID_dict[os.path.basename(image_path)] for image_path in image_path_list], dtype=np.int)
+        print("Saving clustering result ...")
+        image_name_to_cluster_ID_array = np.transpose(np.vstack(([os.path.basename(image_path) for image_path in image_path_list], cluster_ID_array)))
+        np.save(CLUSTERING_RESULT_FILE_PATH, image_name_to_cluster_ID_array)
 
     print("The ID value and count are as follows:")
     cluster_ID_values, cluster_ID_counts = np.unique(cluster_ID_array, return_counts=True)
@@ -76,7 +78,10 @@ def perform_CV(image_path_list):
     for train_index_array, valid_index_array in cv_object.split(X=np.zeros((len(cluster_ID_array), 1)), groups=cluster_ID_array):
         valid_sample_ratio = len(valid_index_array) / (len(train_index_array) + len(valid_index_array))
         if valid_sample_ratio > 0.15 and valid_sample_ratio < 0.25:
-            return train_index_array, valid_index_array
+            train_unique_label_num = len(np.unique([image_path.split("/")[-2] for image_path in np.array(image_path_list)[train_index_array]]))
+            valid_unique_label_num = len(np.unique([image_path.split("/")[-2] for image_path in np.array(image_path_list)[valid_index_array]]))
+            if  train_unique_label_num == valid_unique_label_num:
+                return train_index_array, valid_index_array
 
     assert False
 
