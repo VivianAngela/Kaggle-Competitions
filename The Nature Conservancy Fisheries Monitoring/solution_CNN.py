@@ -75,12 +75,18 @@ def perform_CV(image_path_list, resized_image_row_size=64, resized_image_column_
         os.symlink(image_path, os.path.join(sub_clustering_folder_path, os.path.basename(image_path)))
 
     cv_object = GroupShuffleSplit(n_splits=100, test_size=0.2, random_state=0)
-    for train_index_array, valid_index_array in cv_object.split(X=np.zeros((len(cluster_ID_array), 1)), groups=cluster_ID_array):
+    for cv_index, (train_index_array, valid_index_array) in enumerate(cv_object.split(X=np.zeros((len(cluster_ID_array), 1)), groups=cluster_ID_array), start=1):
+        print("Checking cv {} ...".format(cv_index))
         valid_sample_ratio = len(valid_index_array) / (len(train_index_array) + len(valid_index_array))
-        if valid_sample_ratio > 0.15 and valid_sample_ratio < 0.25:
-            train_unique_label_num = len(np.unique([image_path.split("/")[-2] for image_path in np.array(image_path_list)[train_index_array]]))
-            valid_unique_label_num = len(np.unique([image_path.split("/")[-2] for image_path in np.array(image_path_list)[valid_index_array]]))
-            if  train_unique_label_num == valid_unique_label_num:
+        if -1 in np.unique(cluster_ID_array[train_index_array]) and valid_sample_ratio > 0.15 and valid_sample_ratio < 0.25:
+            train_unique_label, train_unique_counts = np.unique([image_path.split("/")[-2] for image_path in np.array(image_path_list)[train_index_array]], return_counts=True)
+            valid_unique_label, valid_unique_counts = np.unique([image_path.split("/")[-2] for image_path in np.array(image_path_list)[valid_index_array]], return_counts=True)
+            if np.array_equal(train_unique_label, valid_unique_label):
+                train_unique_ratio = train_unique_counts / np.sum(train_unique_counts)
+                valid_unique_ratio = valid_unique_counts / np.sum(valid_unique_counts)
+                print("Using {:.2f}% original training samples as validation samples ...".format(valid_sample_ratio * 100))
+                print("For training samples: {}".format(train_unique_ratio))
+                print("For validation samples: {}".format(valid_unique_ratio))
                 return train_index_array, valid_index_array
 
     assert False
