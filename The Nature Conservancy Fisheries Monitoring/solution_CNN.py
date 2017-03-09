@@ -4,6 +4,7 @@ import shutil
 import numpy as np
 import pandas as pd
 from keras.applications.vgg16 import VGG16
+from keras.callbacks import ModelCheckpoint
 from keras.layers import Dense, Dropout, Flatten, Input
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
@@ -17,7 +18,7 @@ TEST_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "test_stg1")
 
 # Output
 OUTPUT_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "{}_output".format(os.path.basename(__file__).split(".")[0]))
-OPTIMAL_WEIGHTS_FILE_PATH = os.path.join(OUTPUT_FOLDER_PATH, "optimal_weights.h5")
+OPTIMAL_WEIGHTS_FILE_PATH = None
 TRIAL_NUM = 10
 
 # Image processing
@@ -98,15 +99,17 @@ def run():
     print("Initializing model ...")
     model = init_model(unique_label_num=len(unique_label_list))
 
-    if not os.path.isfile(OPTIMAL_WEIGHTS_FILE_PATH):
+    if OPTIMAL_WEIGHTS_FILE_PATH is not None and os.path.isfile(OPTIMAL_WEIGHTS_FILE_PATH):
+        print("Loading weights at {} ...".format(OPTIMAL_WEIGHTS_FILE_PATH))
+        model.load_weights(OPTIMAL_WEIGHTS_FILE_PATH)
+    else:
         print("Performing the training procedure ...")
         train_generator = load_dataset(TRAIN_FOLDER_PATH, classes=unique_label_list, class_mode="categorical", shuffle=True, seed=0)
+        modelcheckpoint_callback = ModelCheckpoint(os.path.join(OUTPUT_FOLDER_PATH, "epoch_{epoch:02d}-loss_{loss:.2f}-acc_{acc:.2f}.h5"), save_best_only=False, save_weights_only=True, period=5)
         model.fit_generator(generator=train_generator,
                             samples_per_epoch=len(train_generator.filenames),
+                            callbacks=[modelcheckpoint_callback],
                             nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
-
-    print("Loading weights at {} ...".format(OPTIMAL_WEIGHTS_FILE_PATH))
-    model.load_weights(OPTIMAL_WEIGHTS_FILE_PATH)
 
     for trial_index in np.arange(TRIAL_NUM) + 1:
         print("Working on trial {}/{} ...".format(trial_index, TRIAL_NUM))
