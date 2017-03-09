@@ -86,6 +86,30 @@ def load_dataset(folder_path, classes=None, class_mode=None, shuffle=True, seed=
 
     return data_generator
 
+def ensemble_predictions():
+    def _ensemble_predictions(ensemble_func, ensemble_submission_file_name):
+        ensemble_proba = ensemble_func(proba_array, axis=0)
+        ensemble_proba = ensemble_proba / np.sum(ensemble_proba, axis=1)[:, np.newaxis]
+        ensemble_submission_file_content.loc[:, proba_columns] = ensemble_proba
+        ensemble_submission_file_content.to_csv(os.path.join(OUTPUT_FOLDER_PATH, ensemble_submission_file_name), index=False)
+
+    # Read predictions
+    submission_file_path_list = glob.glob(os.path.join(OUTPUT_FOLDER_PATH, "Trial_*.csv"))
+    print("There are {} submissions in total.".format(len(submission_file_path_list)))
+    submission_file_content_list = [pd.read_csv(submission_file_path) for submission_file_path in submission_file_path_list]
+    ensemble_submission_file_content = submission_file_content_list[0]
+
+    # Concatenate predictions
+    proba_columns = ensemble_submission_file_content.columns[1:]
+    proba_list = [np.expand_dims(submission_file_content.as_matrix(proba_columns), axis=0)
+                  for submission_file_content in submission_file_content_list]
+    proba_array = np.vstack(proba_list)
+
+    # Ensemble predictions
+    for ensemble_func, ensemble_submission_file_name in \
+        zip([np.max, np.min, np.mean, np.median], ["max.csv", "min.csv", "mean.csv", "median.csv"]):
+        _ensemble_predictions(ensemble_func, ensemble_submission_file_name)
+
 def run():
     print("Reformatting testing dataset ...")
     reformat_testing_dataset()
@@ -122,6 +146,9 @@ def run():
             index_array_for_sorting = np.argsort(image_name_array, axis=0)
             submission_file_content = pd.DataFrame(np.hstack((image_name_array, prediction_array))[index_array_for_sorting.flat])
             submission_file_content.to_csv(submission_file_path, header=["image"] + unique_label_list, index=False)
+
+    print("Performing ensembling ...")
+    ensemble_predictions()
 
     print("All done!")
 
