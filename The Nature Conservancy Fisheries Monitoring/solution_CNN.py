@@ -42,6 +42,17 @@ MAXIMUM_EPOCH_NUM = 1000000
 PATIENCE = 5
 BATCH_SIZE = 32
 
+def reformat_testing_dataset():
+    # Create a dummy folder
+    dummy_test_folder_path = os.path.join(TEST_FOLDER_PATH, "dummy")
+    os.makedirs(dummy_test_folder_path, exist_ok=True)
+
+    # Move files to the dummy folder if needed
+    file_path_list = glob.glob(os.path.join(TEST_FOLDER_PATH, "*"))
+    for file_path in file_path_list:
+        if os.path.isfile(file_path):
+            shutil.move(file_path, os.path.join(dummy_test_folder_path, os.path.basename(file_path)))
+
 def perform_CV(image_path_list, resized_image_row_size=64, resized_image_column_size=64):
     if os.path.isfile(CLUSTERING_RESULT_FILE_PATH):
         print("Loading clustering result ...")
@@ -171,6 +182,9 @@ def init_model(unique_label_num, FC_block_num=2, FC_feature_dim=512, dropout_rat
     return model
 
 def run():
+    print("Reformatting testing dataset ...")
+    reformat_testing_dataset()
+
     print("Loading dataset ...")
     train_generator, valid_generator, test_generator, unique_label_list = load_dataset()
 
