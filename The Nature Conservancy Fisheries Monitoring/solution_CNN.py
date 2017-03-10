@@ -26,7 +26,7 @@ IMAGE_ROW_SIZE = 320
 IMAGE_COLUMN_SIZE = 320
 
 # Training and Testing procedure
-MAXIMUM_EPOCH_NUM = 30
+MAXIMUM_EPOCH_NUM = 50
 BATCH_SIZE = 32
 
 def reformat_testing_dataset():
