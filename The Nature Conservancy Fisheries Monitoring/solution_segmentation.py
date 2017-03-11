@@ -236,7 +236,6 @@ def load_dataset(folder_path_list, color_mode_list, batch_size, classes=None, cl
             shear_range=0.05,
             zoom_range=0.2,
             horizontal_flip=True,
-            vertical_flip=True,
             rescale=1.0 / 255)
         data_generator = data_generator_object.flow_from_directory(
             directory=folder_path,
