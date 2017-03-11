@@ -16,6 +16,7 @@ from keras.layers.normalization import BatchNormalization
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.preprocessing.image import ImageDataGenerator
+from keras.utils.visualize_util import plot
 from scipy.misc import imread, imsave, imresize
 from sklearn.cluster import DBSCAN
 from sklearn.model_selection import GroupShuffleSplit
@@ -44,8 +45,8 @@ OPTIMAL_WEIGHTS_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "Optimal Weights"
 OPTIMAL_WEIGHTS_FILE_RULE = os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "epoch_{epoch:03d}-loss_{loss:.5f}-val_loss_{val_loss:.5f}.h5")
 
 # Image processing
-IMAGE_ROW_SIZE = 512
-IMAGE_COLUMN_SIZE = 512
+IMAGE_ROW_SIZE = 256
+IMAGE_COLUMN_SIZE = 256
 
 # Training and Testing procedure
 MAXIMUM_EPOCH_NUM = 1000
@@ -186,7 +187,7 @@ def reorganize_dataset():
 
     return len(train_index_array), len(valid_index_array)
 
-def init_model(encoder_filter_num_array=(np.arange(5) + 1) * 32, learning_rate=0.0001):
+def init_model(encoder_filter_num_array=(np.arange(3) + 1) * 32, learning_rate=0.0001):
     # Vanilla input
     input_image_tensor = Input(shape=(3, IMAGE_ROW_SIZE, IMAGE_COLUMN_SIZE))
 
@@ -220,6 +221,7 @@ def init_model(encoder_filter_num_array=(np.arange(5) + 1) * 32, learning_rate=0
     # Define and compile the model
     model = Model(input_image_tensor, current_output_tensor)
     model.compile(optimizer=Adam(lr=learning_rate), loss="binary_crossentropy")
+    plot(model, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "model.png"), show_shapes=True, show_layer_names=True)
 
     return model
 
@@ -328,7 +330,7 @@ def run():
         train_generator_for_inspection = load_dataset(folder_path_list=[ACTUAL_TRAIN_ORIGINAL_FOLDER_PATH, ACTUAL_TRAIN_SEGMENTATION_FOLDER_PATH], color_mode_list=["rgb", "grayscale"], batch_size=INSPECT_SIZE, seed=1)
         valid_generator_for_inspection = load_dataset(folder_path_list=[ACTUAL_VALID_ORIGINAL_FOLDER_PATH, ACTUAL_VALID_SEGMENTATION_FOLDER_PATH], color_mode_list=["rgb", "grayscale"], batch_size=INSPECT_SIZE, seed=1)
         earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
-        modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_RULE, monitor="val_loss", save_best_only=True, save_weights_only=True, period=5)
+        modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_RULE, monitor="val_loss", save_best_only=True, save_weights_only=True)
         inspectprediction_callback = InspectPrediction([train_generator_for_inspection, valid_generator_for_inspection])
         inspectloss_callback = InspectLoss()
         model.fit_generator(generator=train_generator,
