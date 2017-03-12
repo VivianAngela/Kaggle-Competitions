@@ -23,7 +23,7 @@ from sklearn.model_selection import GroupShuffleSplit
 DATASET_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset/The Nature Conservancy Fisheries Monitoring")
 TRAIN_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "train")
 TEST_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "test_stg1")
-SEGMENTATION_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "segmentation")
+LOCALIZATION_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "localization")
 ANNOTATION_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "annotations")
 CLUSTERING_RESULT_FILE_PATH = os.path.join(DATASET_FOLDER_PATH, "clustering_result.npy")
 
@@ -33,8 +33,8 @@ CLUSTERING_FOLDER_PATH = os.path.join(WORKSPACE_FOLDER_PATH, "clustering")
 ACTUAL_DATASET_FOLDER_PATH = os.path.join(WORKSPACE_FOLDER_PATH, "actual_dataset")
 ACTUAL_TRAIN_ORIGINAL_FOLDER_PATH = os.path.join(ACTUAL_DATASET_FOLDER_PATH, "train_original")
 ACTUAL_VALID_ORIGINAL_FOLDER_PATH = os.path.join(ACTUAL_DATASET_FOLDER_PATH, "valid_original")
-ACTUAL_TRAIN_SEGMENTATION_FOLDER_PATH = os.path.join(ACTUAL_DATASET_FOLDER_PATH, "train_segmentation")
-ACTUAL_VALID_SEGMENTATION_FOLDER_PATH = os.path.join(ACTUAL_DATASET_FOLDER_PATH, "valid_segmentation")
+ACTUAL_TRAIN_LOCALIZATION_FOLDER_PATH = os.path.join(ACTUAL_DATASET_FOLDER_PATH, "train_localization")
+ACTUAL_VALID_LOCALIZATION_FOLDER_PATH = os.path.join(ACTUAL_DATASET_FOLDER_PATH, "valid_localization")
 
 # Output
 OUTPUT_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "{}_output".format(os.path.basename(__file__).split(".")[0]))
@@ -79,25 +79,25 @@ def load_annotation():
                 annotation_dict[key] = value
     return annotation_dict
 
-def reformat_segmentation():
-    print("Creating the segmentation folder ...")
-    os.makedirs(SEGMENTATION_FOLDER_PATH, exist_ok=True)
+def reformat_localization():
+    print("Creating the localization folder ...")
+    os.makedirs(LOCALIZATION_FOLDER_PATH, exist_ok=True)
 
     print("Loading annotation ...")
     annotation_dict = load_annotation()
 
     original_image_path_list = glob.glob(os.path.join(TRAIN_FOLDER_PATH, "*/*"))
     for original_image_path in original_image_path_list:
-        segmentation_image_path = SEGMENTATION_FOLDER_PATH + original_image_path[len(TRAIN_FOLDER_PATH):]
-        if os.path.isfile(segmentation_image_path):
+        localization_image_path = LOCALIZATION_FOLDER_PATH + original_image_path[len(TRAIN_FOLDER_PATH):]
+        if os.path.isfile(localization_image_path):
             continue
 
-        segmentation_image_content = np.zeros(imread(original_image_path).shape[:2], dtype=np.uint8)
+        localization_image_content = np.zeros(imread(original_image_path).shape[:2], dtype=np.uint8)
         for annotation_x, annotation_width, annotation_y, annotation_height in annotation_dict.get(os.path.basename(original_image_path), []):
-            segmentation_image_content[annotation_y:annotation_y + annotation_height, annotation_x:annotation_x + annotation_width] = 255
+            localization_image_content[annotation_y:annotation_y + annotation_height, annotation_x:annotation_x + annotation_width] = 255
 
-        os.makedirs(os.path.abspath(os.path.join(segmentation_image_path, os.pardir)), exist_ok=True)
-        imsave(segmentation_image_path, segmentation_image_content)
+        os.makedirs(os.path.abspath(os.path.join(localization_image_path, os.pardir)), exist_ok=True)
+        imsave(localization_image_path, localization_image_content)
 
 def perform_CV(image_path_list, resized_image_row_size=64, resized_image_column_size=64):
     if os.path.isfile(CLUSTERING_RESULT_FILE_PATH):
@@ -151,40 +151,40 @@ def perform_CV(image_path_list, resized_image_row_size=64, resized_image_column_
 def reorganize_dataset():
     # Get list of files
     original_image_path_list = sorted(glob.glob(os.path.join(TRAIN_FOLDER_PATH, "*/*")))
-    segmentation_image_path_list = sorted(glob.glob(os.path.join(SEGMENTATION_FOLDER_PATH, "*/*")))
+    localization_image_path_list = sorted(glob.glob(os.path.join(LOCALIZATION_FOLDER_PATH, "*/*")))
 
     # Sanity check
     original_image_name_list = [os.path.basename(image_path) for image_path in original_image_path_list]
-    segmentation_image_name_list = [os.path.basename(image_path) for image_path in segmentation_image_path_list]
-    assert np.array_equal(original_image_name_list, segmentation_image_name_list)
+    localization_image_name_list = [os.path.basename(image_path) for image_path in localization_image_path_list]
+    assert np.array_equal(original_image_name_list, localization_image_name_list)
 
     # Perform Cross Validation
     train_index_array, valid_index_array = perform_CV(original_image_path_list)
 
     # Create symbolic links
     shutil.rmtree(ACTUAL_DATASET_FOLDER_PATH, ignore_errors=True)
-    for (actual_original_folder_path, actual_segmentation_folder_path), index_array in zip(
-            ((ACTUAL_TRAIN_ORIGINAL_FOLDER_PATH, ACTUAL_TRAIN_SEGMENTATION_FOLDER_PATH),
-            (ACTUAL_VALID_ORIGINAL_FOLDER_PATH, ACTUAL_VALID_SEGMENTATION_FOLDER_PATH)),
+    for (actual_original_folder_path, actual_localization_folder_path), index_array in zip(
+            ((ACTUAL_TRAIN_ORIGINAL_FOLDER_PATH, ACTUAL_TRAIN_LOCALIZATION_FOLDER_PATH),
+            (ACTUAL_VALID_ORIGINAL_FOLDER_PATH, ACTUAL_VALID_LOCALIZATION_FOLDER_PATH)),
             (train_index_array, valid_index_array)):
         for index_value in index_array:
             original_image_path = original_image_path_list[index_value]
-            segmentation_image_path = segmentation_image_path_list[index_value]
+            localization_image_path = localization_image_path_list[index_value]
 
             path_suffix = original_image_path[len(TRAIN_FOLDER_PATH):]
-            assert path_suffix == segmentation_image_path[len(SEGMENTATION_FOLDER_PATH):]
+            assert path_suffix == localization_image_path[len(LOCALIZATION_FOLDER_PATH):]
 
             if path_suffix[1:].startswith("NoF"):
                 continue
 
             actual_original_image_path = actual_original_folder_path + path_suffix
-            actual_segmentation_image_path = actual_segmentation_folder_path + path_suffix
+            actual_localization_image_path = actual_localization_folder_path + path_suffix
 
             os.makedirs(os.path.abspath(os.path.join(actual_original_image_path, os.pardir)), exist_ok=True)
-            os.makedirs(os.path.abspath(os.path.join(actual_segmentation_image_path, os.pardir)), exist_ok=True)
+            os.makedirs(os.path.abspath(os.path.join(actual_localization_image_path, os.pardir)), exist_ok=True)
 
             os.symlink(original_image_path, actual_original_image_path)
-            os.symlink(segmentation_image_path, actual_segmentation_image_path)
+            os.symlink(localization_image_path, actual_localization_image_path)
 
     return len(glob.glob(os.path.join(ACTUAL_TRAIN_ORIGINAL_FOLDER_PATH, "*/*"))), len(glob.glob(os.path.join(ACTUAL_VALID_ORIGINAL_FOLDER_PATH, "*/*")))
 
@@ -213,16 +213,16 @@ def init_model(target_num=4, FC_block_num=2, FC_feature_dim=512, dropout_ratio=0
 
     return model
 
-def convert_segmentation_to_annotation(segmentation_array, row_size=IMAGE_ROW_SIZE, column_size=IMAGE_COLUMN_SIZE):
+def convert_localization_to_annotation(localization_array, row_size=IMAGE_ROW_SIZE, column_size=IMAGE_COLUMN_SIZE):
     annotation_list = []
-    for segmentation in segmentation_array:
-        segmentation = segmentation[0]
+    for localization in localization_array:
+        localization = localization[0]
 
-        mask_along_row = np.max(segmentation, axis=1) > 0.5
+        mask_along_row = np.max(localization, axis=1) > 0.5
         row_start_index = np.argmax(mask_along_row)
         row_end_index = len(mask_along_row) - np.argmax(np.flipud(mask_along_row)) - 1
 
-        mask_along_column = np.max(segmentation, axis=0) > 0.5
+        mask_along_column = np.max(localization, axis=0) > 0.5
         column_start_index = np.argmax(mask_along_column)
         column_end_index = len(mask_along_column) - np.argmax(np.flipud(mask_along_column)) - 1
 
@@ -231,10 +231,10 @@ def convert_segmentation_to_annotation(segmentation_array, row_size=IMAGE_ROW_SI
 
     return np.array(annotation_list).astype(np.float32)
 
-def convert_annotation_to_segmentation(annotation_array, row_size=IMAGE_ROW_SIZE, column_size=IMAGE_COLUMN_SIZE):
-    segmentation_list = []
+def convert_annotation_to_localization(annotation_array, row_size=IMAGE_ROW_SIZE, column_size=IMAGE_COLUMN_SIZE):
+    localization_list = []
     for annotation in annotation_array:
-        segmentation = np.zeros((row_size, column_size))
+        localization = np.zeros((row_size, column_size))
 
         row_start_index = np.max((0, int(annotation[0] * row_size)))
         row_end_index = np.min((row_start_index + int(annotation[1] * row_size), row_size - 1))
@@ -242,10 +242,10 @@ def convert_annotation_to_segmentation(annotation_array, row_size=IMAGE_ROW_SIZE
         column_start_index = np.max((0, int(annotation[2] * column_size)))
         column_end_index = np.min((column_start_index + int(annotation[3] * column_size), column_size - 1))
 
-        segmentation[row_start_index:row_end_index + 1, column_start_index:column_end_index + 1] = 1
-        segmentation_list.append(np.expand_dims(segmentation, axis=0))
+        localization[row_start_index:row_end_index + 1, column_start_index:column_end_index + 1] = 1
+        localization_list.append(np.expand_dims(localization, axis=0))
 
-    return np.array(segmentation_list).astype(np.float32)
+    return np.array(localization_list).astype(np.float32)
 
 def load_dataset(folder_path_list, color_mode_list, batch_size, classes=None, class_mode=None, shuffle=True, seed=None, apply_conversion=False):
     # Get the generator of the dataset
@@ -277,7 +277,7 @@ def load_dataset(folder_path_list, color_mode_list, batch_size, classes=None, cl
     if apply_conversion:
         assert len(data_generator_list) == 2
         for X_array, Y_array in zip(*data_generator_list):
-            yield (X_array, convert_segmentation_to_annotation(Y_array))
+            yield (X_array, convert_localization_to_annotation(Y_array))
     else:
         for array_tuple in zip(*data_generator_list):
             yield array_tuple
@@ -291,7 +291,7 @@ class InspectPrediction(Callback):
     def on_epoch_end(self, epoch, logs=None):
         for data_generator_index, data_generator in enumerate(self.data_generator_list, start=1):
             X_array, GT_Y_array = next(data_generator)
-            P_Y_array = convert_annotation_to_segmentation(self.model.predict_on_batch(X_array))
+            P_Y_array = convert_annotation_to_localization(self.model.predict_on_batch(X_array))
 
             for sample_index, (X, GT_Y, P_Y) in enumerate(zip(X_array, GT_Y_array, P_Y_array), start=1):
                 pylab.figure()
@@ -340,8 +340,8 @@ def run():
     print("Reformatting testing dataset ...")
     reformat_testing_dataset()
 
-    print("Reformatting segmentation ...")
-    reformat_segmentation()
+    print("Reformatting localization ...")
+    reformat_localization()
 
     print("Reorganizing dataset ...")
     train_sample_num, valid_sample_num = reorganize_dataset()
@@ -352,10 +352,10 @@ def run():
     weights_file_path_list = sorted(glob.glob(os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "*.h5")))
     if len(weights_file_path_list) == 0:
         print("Performing the training procedure ...")
-        train_generator = load_dataset(folder_path_list=[ACTUAL_TRAIN_ORIGINAL_FOLDER_PATH, ACTUAL_TRAIN_SEGMENTATION_FOLDER_PATH], color_mode_list=["rgb", "grayscale"], batch_size=BATCH_SIZE, seed=0, apply_conversion=True)
-        valid_generator = load_dataset(folder_path_list=[ACTUAL_VALID_ORIGINAL_FOLDER_PATH, ACTUAL_VALID_SEGMENTATION_FOLDER_PATH], color_mode_list=["rgb", "grayscale"], batch_size=BATCH_SIZE, seed=0, apply_conversion=True)
-        train_generator_for_inspection = load_dataset(folder_path_list=[ACTUAL_TRAIN_ORIGINAL_FOLDER_PATH, ACTUAL_TRAIN_SEGMENTATION_FOLDER_PATH], color_mode_list=["rgb", "grayscale"], batch_size=INSPECT_SIZE, seed=1)
-        valid_generator_for_inspection = load_dataset(folder_path_list=[ACTUAL_VALID_ORIGINAL_FOLDER_PATH, ACTUAL_VALID_SEGMENTATION_FOLDER_PATH], color_mode_list=["rgb", "grayscale"], batch_size=INSPECT_SIZE, seed=1)
+        train_generator = load_dataset(folder_path_list=[ACTUAL_TRAIN_ORIGINAL_FOLDER_PATH, ACTUAL_TRAIN_LOCALIZATION_FOLDER_PATH], color_mode_list=["rgb", "grayscale"], batch_size=BATCH_SIZE, seed=0, apply_conversion=True)
+        valid_generator = load_dataset(folder_path_list=[ACTUAL_VALID_ORIGINAL_FOLDER_PATH, ACTUAL_VALID_LOCALIZATION_FOLDER_PATH], color_mode_list=["rgb", "grayscale"], batch_size=BATCH_SIZE, seed=0, apply_conversion=True)
+        train_generator_for_inspection = load_dataset(folder_path_list=[ACTUAL_TRAIN_ORIGINAL_FOLDER_PATH, ACTUAL_TRAIN_LOCALIZATION_FOLDER_PATH], color_mode_list=["rgb", "grayscale"], batch_size=INSPECT_SIZE, seed=1)
+        valid_generator_for_inspection = load_dataset(folder_path_list=[ACTUAL_VALID_ORIGINAL_FOLDER_PATH, ACTUAL_VALID_LOCALIZATION_FOLDER_PATH], color_mode_list=["rgb", "grayscale"], batch_size=INSPECT_SIZE, seed=1)
         earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
         modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_RULE, monitor="val_loss", save_best_only=True, save_weights_only=True)
         inspectprediction_callback = InspectPrediction([train_generator_for_inspection, valid_generator_for_inspection])
