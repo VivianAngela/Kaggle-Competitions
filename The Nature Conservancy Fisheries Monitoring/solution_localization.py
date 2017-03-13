@@ -23,6 +23,8 @@ from sklearn.model_selection import GroupShuffleSplit
 DATASET_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset/The Nature Conservancy Fisheries Monitoring")
 TRAIN_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "train")
 TEST_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "test_stg1")
+CROPPED_TRAIN_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "cropped_train")
+CROPPED_TEST_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "cropped_test_stg1")
 LOCALIZATION_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "localization")
 ANNOTATION_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "annotations")
 CLUSTERING_RESULT_FILE_PATH = os.path.join(DATASET_FOLDER_PATH, "clustering_result.npy")
@@ -45,12 +47,17 @@ OPTIMAL_WEIGHTS_FILE_RULE = os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "epoch_{ep
 # Image processing
 IMAGE_ROW_SIZE = 256
 IMAGE_COLUMN_SIZE = 256
+CROPPED_IMAGE_ROW_SIZE = 512
+CROPPED_IMAGE_COLUMN_SIZE = 512
 
 # Training and Testing procedure
+PERFORM_TRAINING = False
+WEIGHTS_FILE_PATH = "/data/Dataset/The Nature Conservancy Fisheries Monitoring/Results/Mar_12_01/solution_localization_step_4_output/Optimal Weights/epoch_019-loss_0.00573-val_loss_0.00577.h5"
 MAXIMUM_EPOCH_NUM = 1000
 PATIENCE = 100
 BATCH_SIZE = 32
 INSPECT_SIZE = 4
+SEED = 0
 
 def reformat_testing_dataset():
     # Create a dummy folder
@@ -188,14 +195,15 @@ def reorganize_dataset():
 
     return len(glob.glob(os.path.join(ACTUAL_TRAIN_ORIGINAL_FOLDER_PATH, "*/*"))), len(glob.glob(os.path.join(ACTUAL_VALID_ORIGINAL_FOLDER_PATH, "*/*")))
 
-def init_model(target_num=4, FC_block_num=2, FC_feature_dim=512, dropout_ratio=0.5, learning_rate=0.0001):
+def init_model(target_num=4, FC_block_num=2, FC_feature_dim=512, dropout_ratio=0.5, learning_rate=0.0001, freeze_pretrained_model=True):
     # Get the input tensor
     input_tensor = Input(shape=(3, IMAGE_ROW_SIZE, IMAGE_COLUMN_SIZE))
 
     # Convolutional blocks
     pretrained_model = VGG16(include_top=False, weights="imagenet")
-    for layer in pretrained_model.layers:
-        layer.trainable = False
+    if freeze_pretrained_model:
+        for layer in pretrained_model.layers:
+            layer.trainable = False
     output_tensor = pretrained_model(input_tensor)
 
     # FullyConnected blocks
@@ -210,6 +218,12 @@ def init_model(target_num=4, FC_block_num=2, FC_feature_dim=512, dropout_ratio=0
     model = Model(input_tensor, output_tensor)
     model.compile(optimizer=Adam(lr=learning_rate), loss="mse")
     plot(model, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "model.png"), show_shapes=True, show_layer_names=True)
+
+    # Load weights if applicable
+    if WEIGHTS_FILE_PATH is not None:
+        assert os.path.isfile(WEIGHTS_FILE_PATH), "Could not find file {}!".format(WEIGHTS_FILE_PATH)
+        print("Loading weights from {} ...".format(WEIGHTS_FILE_PATH))
+        model.load_weights(WEIGHTS_FILE_PATH)
 
     return model
 
@@ -247,10 +261,10 @@ def convert_annotation_to_localization(annotation_array, row_size=IMAGE_ROW_SIZE
 
     return np.array(localization_list).astype(np.float32)
 
-def load_dataset(folder_path_list, color_mode_list, batch_size, classes=None, class_mode=None, shuffle=True, seed=None, apply_conversion=False):
+def load_dataset_for_training(original_folder_path, localization_folder_path, batch_size, seed, apply_conversion):
     # Get the generator of the dataset
-    data_generator_list = []
-    for folder_path, color_mode in zip(folder_path_list, color_mode_list):
+    folder_generator_list = []
+    for folder_path, color_mode in zip((original_folder_path, localization_folder_path), ("rgb", "grayscale")):
         data_generator_object = ImageDataGenerator(
             rotation_range=10,
             width_shift_range=0.05,
@@ -263,24 +277,38 @@ def load_dataset(folder_path_list, color_mode_list, batch_size, classes=None, cl
             directory=folder_path,
             target_size=(IMAGE_ROW_SIZE, IMAGE_COLUMN_SIZE),
             color_mode=color_mode,
-            classes=classes,
-            class_mode=class_mode,
+            classes=None,
+            class_mode=None,
             batch_size=batch_size,
-            shuffle=shuffle,
+            shuffle=True,
             seed=seed)
-        data_generator_list.append(data_generator)
+        folder_generator_list.append(data_generator)
 
     # Sanity check
-    filenames_list = [data_generator.filenames for data_generator in data_generator_list]
-    assert all(filenames == filenames_list[0] for filenames in filenames_list)
+    original_folder_generator, localization_folder_generator = folder_generator_list
+    assert original_folder_generator.filenames == localization_folder_generator.filenames
 
-    if apply_conversion:
-        assert len(data_generator_list) == 2
-        for X_array, Y_array in zip(*data_generator_list):
-            yield (X_array, convert_localization_to_annotation(Y_array))
-    else:
-        for array_tuple in zip(*data_generator_list):
-            yield array_tuple
+    # Yield data in batches
+    for X_array, Y_array in zip(original_folder_generator, localization_folder_generator):
+        if apply_conversion:
+            yield X_array, convert_localization_to_annotation(Y_array)
+        else:
+            yield X_array, Y_array
+
+def load_dataset_for_testing(original_folder_path, batch_size):
+    # Get the generator of the dataset
+    original_folder_generator_object = ImageDataGenerator(rescale=1.0 / 255)
+    original_folder_generator = original_folder_generator_object.flow_from_directory(
+        directory=original_folder_path,
+        target_size=(IMAGE_ROW_SIZE, IMAGE_COLUMN_SIZE),
+        color_mode="rgb",
+        classes=None,
+        class_mode=None,
+        batch_size=batch_size,
+        shuffle=False,
+        seed=None)
+
+    return original_folder_generator
 
 class InspectPrediction(Callback):
     def __init__(self, data_generator_list):
@@ -349,13 +377,12 @@ def run():
     print("Initializing model ...")
     model = init_model()
 
-    weights_file_path_list = sorted(glob.glob(os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "*.h5")))
-    if len(weights_file_path_list) == 0:
+    if PERFORM_TRAINING:
         print("Performing the training procedure ...")
-        train_generator = load_dataset(folder_path_list=[ACTUAL_TRAIN_ORIGINAL_FOLDER_PATH, ACTUAL_TRAIN_LOCALIZATION_FOLDER_PATH], color_mode_list=["rgb", "grayscale"], batch_size=BATCH_SIZE, seed=0, apply_conversion=True)
-        valid_generator = load_dataset(folder_path_list=[ACTUAL_VALID_ORIGINAL_FOLDER_PATH, ACTUAL_VALID_LOCALIZATION_FOLDER_PATH], color_mode_list=["rgb", "grayscale"], batch_size=BATCH_SIZE, seed=0, apply_conversion=True)
-        train_generator_for_inspection = load_dataset(folder_path_list=[ACTUAL_TRAIN_ORIGINAL_FOLDER_PATH, ACTUAL_TRAIN_LOCALIZATION_FOLDER_PATH], color_mode_list=["rgb", "grayscale"], batch_size=INSPECT_SIZE, seed=1)
-        valid_generator_for_inspection = load_dataset(folder_path_list=[ACTUAL_VALID_ORIGINAL_FOLDER_PATH, ACTUAL_VALID_LOCALIZATION_FOLDER_PATH], color_mode_list=["rgb", "grayscale"], batch_size=INSPECT_SIZE, seed=1)
+        train_generator = load_dataset_for_training(ACTUAL_TRAIN_ORIGINAL_FOLDER_PATH, ACTUAL_TRAIN_LOCALIZATION_FOLDER_PATH, batch_size=BATCH_SIZE, seed=SEED, apply_conversion=True)
+        valid_generator = load_dataset_for_training(ACTUAL_VALID_ORIGINAL_FOLDER_PATH, ACTUAL_VALID_LOCALIZATION_FOLDER_PATH, batch_size=BATCH_SIZE, seed=SEED, apply_conversion=True)
+        train_generator_for_inspection = load_dataset_for_training(ACTUAL_TRAIN_ORIGINAL_FOLDER_PATH, ACTUAL_TRAIN_LOCALIZATION_FOLDER_PATH, batch_size=INSPECT_SIZE, seed=SEED + 1, apply_conversion=False)
+        valid_generator_for_inspection = load_dataset_for_training(ACTUAL_VALID_ORIGINAL_FOLDER_PATH, ACTUAL_VALID_LOCALIZATION_FOLDER_PATH, batch_size=INSPECT_SIZE, seed=SEED + 1, apply_conversion=False)
         earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
         modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_RULE, monitor="val_loss", save_best_only=True, save_weights_only=True)
         inspectprediction_callback = InspectPrediction([train_generator_for_inspection, valid_generator_for_inspection])
@@ -366,7 +393,36 @@ def run():
                             nb_val_samples=valid_sample_num,
                             callbacks=[earlystopping_callback, modelcheckpoint_callback, inspectprediction_callback, inspectloss_callback],
                             nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
-        weights_file_path_list = sorted(glob.glob(os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "*.h5")))
+    else:
+        assert WEIGHTS_FILE_PATH is not None
+
+        print("Performing the testing procedure ...")
+        train_generator = load_dataset_for_testing(TRAIN_FOLDER_PATH, batch_size=BATCH_SIZE)
+        test_generator = load_dataset_for_testing(TEST_FOLDER_PATH, batch_size=BATCH_SIZE)
+        for data_generator, cropped_folder_path, original_folder_path in zip((train_generator, test_generator), (CROPPED_TRAIN_FOLDER_PATH, CROPPED_TEST_FOLDER_PATH), (TRAIN_FOLDER_PATH, TEST_FOLDER_PATH)):
+            prediction_array = model.predict_generator(generator=data_generator, val_samples=len(data_generator.filenames))
+            for relative_file_path, prediction in zip(data_generator.filenames, prediction_array):
+                cropped_file_path = os.path.join(cropped_folder_path, relative_file_path)
+                if os.path.isfile(cropped_file_path):
+                    continue
+
+                image_content = imread(os.path.join(original_folder_path, relative_file_path))
+                row_size, column_size = image_content.shape[:2]
+
+                center_pixel_row_index = (prediction[0] + 0.5 * prediction[1]) * row_size
+                center_pixel_column_index = (prediction[2] + 0.5 * prediction[3]) * column_size
+                side_length = np.max(((prediction[1] + 0.2) * row_size, (prediction[3] + 0.2) * column_size))
+
+                row_start_index = np.max((0, int(center_pixel_row_index - 0.5 * side_length)))
+                row_end_index = np.min((int(center_pixel_row_index + 0.5 * side_length), row_size))
+                column_start_index = np.max((0, int(center_pixel_column_index - 0.5 * side_length)))
+                column_end_index = np.min((int(center_pixel_column_index + 0.5 * side_length), column_size))
+
+                cropped_image_content = image_content[row_start_index:row_end_index, column_start_index:column_end_index]
+                resized_cropped_image_content = imresize(cropped_image_content, (CROPPED_IMAGE_ROW_SIZE, CROPPED_IMAGE_COLUMN_SIZE))
+
+                os.makedirs(os.path.abspath(os.path.join(cropped_file_path, os.pardir)), exist_ok=True)
+                imsave(cropped_file_path, resized_cropped_image_content)
 
     print("All done!")
 
