@@ -409,9 +409,18 @@ def run():
                 image_content = imread(os.path.join(original_folder_path, relative_file_path))
                 row_size, column_size = image_content.shape[:2]
 
+                expand_ratio = 0.2
+                localization_image_path = os.path.join(LOCALIZATION_FOLDER_PATH, relative_file_path)
+                if os.path.isfile(localization_image_path):
+                    localization_image_content = imread(localization_image_path)
+                    localization_array = np.array([[localization_image_content]], dtype=np.float32) / 255
+                    annotation_array = convert_localization_to_annotation(localization_array, row_size=localization_image_content.shape[0], column_size=localization_image_content.shape[1])
+                    prediction = annotation_array[0]
+                    expand_ratio = 0
+
                 center_pixel_row_index = (prediction[0] + 0.5 * prediction[1]) * row_size
                 center_pixel_column_index = (prediction[2] + 0.5 * prediction[3]) * column_size
-                side_length = np.max(((prediction[1] + 0.2) * row_size, (prediction[3] + 0.2) * column_size))
+                side_length = np.max(((prediction[1] + expand_ratio) * row_size, (prediction[3] + expand_ratio) * column_size))
 
                 row_start_index = np.max((0, int(center_pixel_row_index - 0.5 * side_length)))
                 row_end_index = np.min((int(center_pixel_row_index + 0.5 * side_length), row_size))
