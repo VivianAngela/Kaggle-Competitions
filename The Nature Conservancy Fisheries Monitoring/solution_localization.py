@@ -52,7 +52,7 @@ CROPPED_IMAGE_COLUMN_SIZE = 512
 
 # Training and Testing procedure
 PERFORM_TRAINING = False
-WEIGHTS_FILE_PATH = "/data/Dataset/The Nature Conservancy Fisheries Monitoring/Results/Mar_12_01/solution_localization_step_4_output/Optimal Weights/epoch_019-loss_0.00573-val_loss_0.00577.h5"
+WEIGHTS_FILE_PATH = "/data/Dataset/The Nature Conservancy Fisheries Monitoring/Results/Mar_12/solution_localization_step_4_output/Optimal Weights/epoch_019-loss_0.00573-val_loss_0.00577.h5"
 MAXIMUM_EPOCH_NUM = 1000
 PATIENCE = 100
 BATCH_SIZE = 32
@@ -414,7 +414,7 @@ def run():
                 if os.path.isfile(localization_image_path):
                     localization_image_content = imread(localization_image_path)
                     localization_array = np.array([[localization_image_content]], dtype=np.float32) / 255
-                    annotation_array = convert_localization_to_annotation(localization_array, row_size=localization_image_content.shape[0], column_size=localization_image_content.shape[1])
+                    annotation_array = convert_localization_to_annotation(localization_array, row_size=row_size, column_size=column_size)
                     prediction = annotation_array[0]
                     expand_ratio = 0
 
