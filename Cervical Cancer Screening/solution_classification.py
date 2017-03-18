@@ -16,21 +16,19 @@ from keras.optimizers import Adam
 from keras.preprocessing.image import ImageDataGenerator
 from keras.utils.visualize_util import plot
 from scipy.misc import imread, imresize
-from sklearn.cluster import DBSCAN
 from sklearn.model_selection import GroupShuffleSplit
 
 # Dataset
+# TODO: Modify variables related to paths
 DATASET_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset/The Nature Conservancy Fisheries Monitoring")
-CROPPED_TRAIN_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "cropped_train")
-CROPPED_TEST_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "cropped_test_stg1")
-CLUSTERING_RESULT_FILE_PATH = os.path.join(DATASET_FOLDER_PATH, "clustering_result.npy")
+TRAIN_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "train")
+TEST_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "test_stg1")
 
 # Workspace
 WORKSPACE_FOLDER_PATH = os.path.join("/tmp", os.path.basename(DATASET_FOLDER_PATH))
-CLUSTERING_FOLDER_PATH = os.path.join(WORKSPACE_FOLDER_PATH, "clustering")
 ACTUAL_DATASET_FOLDER_PATH = os.path.join(WORKSPACE_FOLDER_PATH, "actual_dataset")
-ACTUAL_CROPPED_TRAIN_FOLDER_PATH = os.path.join(ACTUAL_DATASET_FOLDER_PATH, "cropped_train")
-ACTUAL_CROPPED_VALID_FOLDER_PATH = os.path.join(ACTUAL_DATASET_FOLDER_PATH, "cropped_valid")
+ACTUAL_TRAIN_FOLDER_PATH = os.path.join(ACTUAL_DATASET_FOLDER_PATH, "train")
+ACTUAL_VALID_FOLDER_PATH = os.path.join(ACTUAL_DATASET_FOLDER_PATH, "valid")
 
 # Output
 OUTPUT_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "{}_output".format(os.path.basename(__file__).split(".")[0]))
@@ -51,38 +49,8 @@ PATIENCE = 100
 BATCH_SIZE = 32
 SEED = 0
 
-def perform_CV(image_path_list, resized_image_row_size=64, resized_image_column_size=64):
-    if os.path.isfile(CLUSTERING_RESULT_FILE_PATH):
-        print("Loading clustering result ...")
-        image_name_to_cluster_ID_array = np.load(CLUSTERING_RESULT_FILE_PATH)
-        image_name_to_cluster_ID_dict = dict(image_name_to_cluster_ID_array)
-        cluster_ID_array = np.array([image_name_to_cluster_ID_dict[os.path.basename(image_path)] for image_path in image_path_list], dtype=np.int)
-    else:
-        print("Reading image content ...")
-        image_content_array = np.array([imresize(imread(image_path), (resized_image_row_size, resized_image_column_size)) for image_path in image_path_list])
-        image_content_array = np.reshape(image_content_array, (len(image_content_array), -1))
-        image_content_array = np.array([(image_content - image_content.mean()) / image_content.std() for image_content in image_content_array], dtype=np.float32)
-
-        print("Apply clustering ...")
-        cluster_ID_array = DBSCAN(eps=1.5 * resized_image_row_size * resized_image_column_size, min_samples=20, metric="l1", n_jobs=-1).fit_predict(image_content_array)
-
-        print("Saving clustering result ...")
-        image_name_to_cluster_ID_array = np.transpose(np.vstack(([os.path.basename(image_path) for image_path in image_path_list], cluster_ID_array)))
-        np.save(CLUSTERING_RESULT_FILE_PATH, image_name_to_cluster_ID_array)
-
-    print("The ID value and count are as follows:")
-    cluster_ID_values, cluster_ID_counts = np.unique(cluster_ID_array, return_counts=True)
-    for cluster_ID_value, cluster_ID_count in zip(cluster_ID_values, cluster_ID_counts):
-        print("{}\t{}".format(cluster_ID_value, cluster_ID_count))
-
-    print("Visualizing clustering result ...")
-    shutil.rmtree(CLUSTERING_FOLDER_PATH, ignore_errors=True)
-    for image_path, cluster_ID in zip(image_path_list, cluster_ID_array):
-        sub_clustering_folder_path = os.path.join(CLUSTERING_FOLDER_PATH, str(cluster_ID))
-        if not os.path.isdir(sub_clustering_folder_path):
-            os.makedirs(sub_clustering_folder_path)
-        os.symlink(image_path, os.path.join(sub_clustering_folder_path, os.path.basename(image_path)))
-
+def perform_CV(image_path_list):
+    # TODO: Use 20% training samples for validation. Make sure to that there is no information leakage. Check http://scikit-learn.org/stable/modules/cross_validation.html#leave-p-groups-out.
     cv_object = GroupShuffleSplit(n_splits=100, test_size=0.2, random_state=0)
     for cv_index, (train_index_array, valid_index_array) in enumerate(cv_object.split(X=np.zeros((len(cluster_ID_array), 1)), groups=cluster_ID_array), start=1):
         print("Checking cv {} ...".format(cv_index))
@@ -102,22 +70,22 @@ def perform_CV(image_path_list, resized_image_row_size=64, resized_image_column_
 
 def reorganize_dataset():
     # Get list of files
-    original_image_path_list = sorted(glob.glob(os.path.join(CROPPED_TRAIN_FOLDER_PATH, "*/*")))
+    original_image_path_list = sorted(glob.glob(os.path.join(TRAIN_FOLDER_PATH, "*/*")))
 
     # Perform Cross Validation
     train_index_array, valid_index_array = perform_CV(original_image_path_list)
 
     # Create symbolic links
     shutil.rmtree(ACTUAL_DATASET_FOLDER_PATH, ignore_errors=True)
-    for folder_path, index_array in zip((ACTUAL_CROPPED_TRAIN_FOLDER_PATH, ACTUAL_CROPPED_VALID_FOLDER_PATH), (train_index_array, valid_index_array)):
+    for folder_path, index_array in zip((ACTUAL_TRAIN_FOLDER_PATH, ACTUAL_VALID_FOLDER_PATH), (train_index_array, valid_index_array)):
         for index_value in index_array:
             original_image_path = original_image_path_list[index_value]
-            path_suffix = original_image_path[len(CROPPED_TRAIN_FOLDER_PATH):]
+            path_suffix = original_image_path[len(TRAIN_FOLDER_PATH):]
             actual_original_image_path = folder_path + path_suffix
             os.makedirs(os.path.abspath(os.path.join(actual_original_image_path, os.pardir)), exist_ok=True)
             os.symlink(original_image_path, actual_original_image_path)
 
-    return len(glob.glob(os.path.join(ACTUAL_CROPPED_TRAIN_FOLDER_PATH, "*/*"))), len(glob.glob(os.path.join(ACTUAL_CROPPED_VALID_FOLDER_PATH, "*/*")))
+    return len(glob.glob(os.path.join(ACTUAL_TRAIN_FOLDER_PATH, "*/*"))), len(glob.glob(os.path.join(ACTUAL_VALID_FOLDER_PATH, "*/*")))
 
 def init_model(target_num, FC_block_num=2, FC_feature_dim=512, dropout_ratio=0.5, learning_rate=0.00001, freeze_pretrained_model=True):
     # Get the input tensor
@@ -228,15 +196,15 @@ def run():
     train_sample_num, valid_sample_num = reorganize_dataset()
 
     print("Getting the labels ...")
-    unique_label_list = sorted([folder_name for folder_name in os.listdir(CROPPED_TRAIN_FOLDER_PATH) if os.path.isdir(os.path.join(CROPPED_TRAIN_FOLDER_PATH, folder_name))])
+    unique_label_list = sorted([folder_name for folder_name in os.listdir(TRAIN_FOLDER_PATH) if os.path.isdir(os.path.join(TRAIN_FOLDER_PATH, folder_name))])
 
     print("Initializing model ...")
     model = init_model(target_num=len(unique_label_list))
 
     if PERFORM_TRAINING:
         print("Performing the training procedure ...")
-        train_generator = load_dataset(ACTUAL_CROPPED_TRAIN_FOLDER_PATH, classes=unique_label_list, class_mode="categorical", shuffle=True, seed=SEED)
-        valid_generator = load_dataset(ACTUAL_CROPPED_VALID_FOLDER_PATH, classes=unique_label_list, class_mode="categorical", shuffle=True, seed=SEED)
+        train_generator = load_dataset(ACTUAL_TRAIN_FOLDER_PATH, classes=unique_label_list, class_mode="categorical", shuffle=True, seed=SEED)
+        valid_generator = load_dataset(ACTUAL_VALID_FOLDER_PATH, classes=unique_label_list, class_mode="categorical", shuffle=True, seed=SEED)
         earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
         modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_RULE, monitor="val_loss", save_best_only=True, save_weights_only=True)
         inspectloss_callback = InspectLoss()
@@ -255,7 +223,7 @@ def run():
             submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "Trial_{}.csv".format(trial_index))
             if not os.path.isfile(submission_file_path):
                 print("Performing the testing procedure ...")
-                test_generator = load_dataset(CROPPED_TEST_FOLDER_PATH, shuffle=False, seed=trial_index)
+                test_generator = load_dataset(TEST_FOLDER_PATH, shuffle=False, seed=trial_index)
                 prediction_array = model.predict_generator(generator=test_generator, val_samples=len(test_generator.filenames))
                 image_name_array = np.expand_dims([os.path.basename(image_path) for image_path in test_generator.filenames], axis=-1)
                 index_array_for_sorting = np.argsort(image_name_array, axis=0)
