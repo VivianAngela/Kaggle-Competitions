@@ -7,8 +7,10 @@ import numpy as np
 import pandas as pd
 from keras.applications.vgg16 import VGG16
 from keras.callbacks import EarlyStopping, ModelCheckpoint
-from keras.layers import Dense, Dropout, Flatten, Input
+from keras.layers import Activation, Input
+from keras.layers.convolutional import Convolution2D
 from keras.layers.normalization import BatchNormalization
+from keras.layers.pooling import GlobalAveragePooling2D
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.preprocessing.image import ImageDataGenerator
@@ -28,7 +30,7 @@ TRIAL_NUM = 10
 
 # Image processing
 IMAGE_ROW_SIZE = 256
-IMAGE_COLUMN_SIZE = 256
+IMAGE_COLUMN_SIZE = 512
 
 # Training and Testing procedure
 PERFORM_TRAINING = True
@@ -38,28 +40,30 @@ PATIENCE = 100
 BATCH_SIZE = 32
 SEED = 0
 
-def init_model(target_num, FC_block_num=2, FC_feature_dim=512, dropout_ratio=0.5, learning_rate=0.0001, freeze_pretrained_model=True):
+def init_model(target_num, additional_block_num=3, additional_filter_num=128, learning_rate=0.0001, freeze_pretrained_model=True):
     # Get the input tensor
     input_tensor = Input(shape=(3, IMAGE_ROW_SIZE, IMAGE_COLUMN_SIZE))
 
     # Convolutional blocks
-    pretrained_model = VGG16(include_top=False, weights="imagenet")
+    pretrained_model = VGG16(include_top=False, weights="imagenet", input_shape=input_tensor._keras_shape[1:])
     if freeze_pretrained_model:
         for layer in pretrained_model.layers:
             layer.trainable = False
     output_tensor = pretrained_model(input_tensor)
 
-    # FullyConnected blocks
-    output_tensor = Flatten()(output_tensor)
-    for _ in range(FC_block_num):
-        output_tensor = Dense(FC_feature_dim, activation="relu")(output_tensor)
-        output_tensor = BatchNormalization()(output_tensor)
-        output_tensor = Dropout(dropout_ratio)(output_tensor)
-    output_tensor = Dense(target_num, activation="softmax")(output_tensor)
+    # Additional convolutional blocks
+    output_tensor = BatchNormalization(mode=0, axis=1)(output_tensor)
+    for _ in range(additional_block_num):
+        output_tensor = Convolution2D(additional_filter_num, 3, 3, subsample=(1, 1), activation="relu", border_mode="same")(output_tensor)
+        output_tensor = BatchNormalization(mode=0, axis=1)(output_tensor)
+    output_tensor = Convolution2D(target_num, 3, 3, subsample=(1, 2), activation="linear", border_mode="same")(output_tensor)
+    output_tensor = GlobalAveragePooling2D()(output_tensor)
+    output_tensor = Activation("softmax")(output_tensor)
 
     # Define and compile the model
     model = Model(input_tensor, output_tensor)
     model.compile(optimizer=Adam(lr=learning_rate), loss="categorical_crossentropy", metrics=["accuracy"])
+    model.summary()
     plot(model, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "model.png"), show_shapes=True, show_layer_names=True)
 
     # Load weights if applicable
