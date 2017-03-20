@@ -7,7 +7,7 @@ import pylab
 import numpy as np
 import pandas as pd
 from keras.applications.vgg16 import VGG16
-from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
+from keras.callbacks import Callback, ModelCheckpoint
 from keras.layers import Activation, Input
 from keras.layers.convolutional import Convolution2D
 from keras.layers.normalization import BatchNormalization
@@ -37,7 +37,7 @@ IMAGE_COLUMN_SIZE = 256
 PERFORM_TRAINING = True
 WEIGHTS_FILE_PATH = None
 MAXIMUM_EPOCH_NUM = 1000
-PATIENCE = 100
+LOSS_THRESHOLD = 0.6
 BATCH_SIZE = 32
 SEED = 0
 
@@ -97,6 +97,16 @@ def load_dataset(folder_path, classes=None, class_mode=None, batch_size=BATCH_SI
 
     return data_generator
 
+class CustomizedStopping(Callback):
+    def __init__(self):
+        super(CustomizedStopping, self).__init__()
+
+    def on_epoch_end(self, epoch, logs=None):
+        current = logs.get("loss")
+        if current < LOSS_THRESHOLD:
+            print("Epoch {:05d}: customized stopping".format(epoch))
+            self.model.stop_training = True
+
 class InspectLoss(Callback):
     def __init__(self):
         super(InspectLoss, self).__init__()
@@ -153,12 +163,12 @@ def run():
     if PERFORM_TRAINING:
         print("Performing the training procedure ...")
         train_generator = load_dataset(CROPPED_TRAIN_FOLDER_PATH, classes=unique_label_list, class_mode="categorical", shuffle=True, seed=SEED)
-        earlystopping_callback = EarlyStopping(monitor="loss", patience=PATIENCE)
+        customizedstopping_callback = CustomizedStopping()
         modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_RULE, monitor="loss", save_best_only=True, save_weights_only=True)
         inspectloss_callback = InspectLoss()
         model.fit_generator(generator=train_generator,
                             samples_per_epoch=len(train_generator.filenames),
-                            callbacks=[earlystopping_callback, modelcheckpoint_callback, inspectloss_callback],
+                            callbacks=[customizedstopping_callback, modelcheckpoint_callback, inspectloss_callback],
                             nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
     else:
         assert WEIGHTS_FILE_PATH is not None
