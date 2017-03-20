@@ -30,7 +30,7 @@ TRIAL_NUM = 10
 
 # Image processing
 IMAGE_ROW_SIZE = 256
-IMAGE_COLUMN_SIZE = 512
+IMAGE_COLUMN_SIZE = 256
 
 # Training and Testing procedure
 PERFORM_TRAINING = True
@@ -56,7 +56,7 @@ def init_model(target_num, additional_block_num=3, additional_filter_num=128, le
     for _ in range(additional_block_num):
         output_tensor = Convolution2D(additional_filter_num, 3, 3, subsample=(1, 1), activation="relu", border_mode="same")(output_tensor)
         output_tensor = BatchNormalization(mode=0, axis=1)(output_tensor)
-    output_tensor = Convolution2D(target_num, 3, 3, subsample=(1, 2), activation="linear", border_mode="same")(output_tensor)
+    output_tensor = Convolution2D(target_num, 3, 3, subsample=(1, 1), activation="linear", border_mode="same")(output_tensor)
     output_tensor = GlobalAveragePooling2D()(output_tensor)
     output_tensor = Activation("softmax")(output_tensor)
 
