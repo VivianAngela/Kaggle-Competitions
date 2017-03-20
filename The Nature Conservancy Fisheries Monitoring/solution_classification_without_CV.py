@@ -3,10 +3,11 @@ matplotlib.use("Agg")
 
 import os
 import glob
+import pylab
 import numpy as np
 import pandas as pd
 from keras.applications.vgg16 import VGG16
-from keras.callbacks import EarlyStopping, ModelCheckpoint
+from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
 from keras.layers import Activation, Input
 from keras.layers.convolutional import Convolution2D
 from keras.layers.normalization import BatchNormalization
@@ -96,6 +97,24 @@ def load_dataset(folder_path, classes=None, class_mode=None, batch_size=BATCH_SI
 
     return data_generator
 
+class InspectLoss(Callback):
+    def __init__(self):
+        super(InspectLoss, self).__init__()
+
+        self.train_loss_list = []
+
+    def on_epoch_end(self, epoch, logs=None):
+        train_loss = logs.get("loss")
+        self.train_loss_list.append(train_loss)
+        epoch_index_array = np.arange(len(self.train_loss_list)) + 1
+
+        pylab.figure()
+        pylab.plot(epoch_index_array, self.train_loss_list, "yellowgreen", label="train_loss")
+        pylab.grid()
+        pylab.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=1, ncol=1, mode="expand", borderaxespad=0.)
+        pylab.savefig(os.path.join(OUTPUT_FOLDER_PATH, "Loss Curve.png"))
+        pylab.close()
+
 def ensemble_predictions(submission_folder_path):
     def _ensemble_predictions(ensemble_func, ensemble_submission_file_name):
         ensemble_proba = ensemble_func(proba_array, axis=0)
@@ -136,9 +155,10 @@ def run():
         train_generator = load_dataset(CROPPED_TRAIN_FOLDER_PATH, classes=unique_label_list, class_mode="categorical", shuffle=True, seed=SEED)
         earlystopping_callback = EarlyStopping(monitor="loss", patience=PATIENCE)
         modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_RULE, monitor="loss", save_best_only=True, save_weights_only=True)
+        inspectloss_callback = InspectLoss()
         model.fit_generator(generator=train_generator,
                             samples_per_epoch=len(train_generator.filenames),
-                            callbacks=[earlystopping_callback, modelcheckpoint_callback],
+                            callbacks=[earlystopping_callback, modelcheckpoint_callback, inspectloss_callback],
                             nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
     else:
         assert WEIGHTS_FILE_PATH is not None
