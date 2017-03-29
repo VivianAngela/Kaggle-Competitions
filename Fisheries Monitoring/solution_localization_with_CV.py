@@ -200,7 +200,7 @@ def init_model(target_num=4, FC_block_num=2, FC_feature_dim=512, dropout_ratio=0
     input_tensor = Input(shape=(3, IMAGE_ROW_SIZE, IMAGE_COLUMN_SIZE))
 
     # Convolutional blocks
-    pretrained_model = VGG16(include_top=False, weights="imagenet")
+    pretrained_model = VGG16(include_top=False, weights="imagenet", input_shape=input_tensor._keras_shape[1:])
     if freeze_pretrained_model:
         for layer in pretrained_model.layers:
             layer.trainable = False
