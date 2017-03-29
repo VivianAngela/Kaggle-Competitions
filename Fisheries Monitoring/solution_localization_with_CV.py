@@ -51,8 +51,8 @@ CROPPED_IMAGE_ROW_SIZE = 256
 CROPPED_IMAGE_COLUMN_SIZE = 256
 
 # Training and Testing procedure
-PERFORM_TRAINING = False
-WEIGHTS_FILE_PATH = "/data/Dataset/The Nature Conservancy Fisheries Monitoring/Results/Mar_12/solution_localization_step_4_output/Optimal Weights/epoch_019-loss_0.00573-val_loss_0.00577.h5"
+PERFORM_TRAINING = True
+WEIGHTS_FILE_PATH = None
 MAXIMUM_EPOCH_NUM = 1000
 PATIENCE = 100
 BATCH_SIZE = 32
