@@ -16,7 +16,7 @@ from keras.layers.pooling import GlobalAveragePooling2D
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.preprocessing.image import ImageDataGenerator
-from keras.utils.visualize_util import plot
+from keras.utils import plot_model
 from scipy.misc import imread, imresize
 from sklearn.cluster import DBSCAN
 from sklearn.model_selection import GroupShuffleSplit
@@ -145,7 +145,7 @@ def init_model(target_num, additional_block_num=3, additional_filter_num=128, le
     model = Model(input_tensor, output_tensor)
     model.compile(optimizer=Adam(lr=learning_rate), loss="categorical_crossentropy", metrics=["accuracy"])
     model.summary()
-    plot(model, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "model.png"), show_shapes=True, show_layer_names=True)
+    plot_model(model, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "model.png"), show_shapes=True, show_layer_names=True)
 
     # Load weights if applicable
     if WEIGHTS_FILE_PATH is not None:

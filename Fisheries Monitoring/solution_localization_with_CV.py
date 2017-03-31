@@ -14,7 +14,7 @@ from keras.layers.normalization import BatchNormalization
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.preprocessing.image import ImageDataGenerator
-from keras.utils.visualize_util import plot
+from keras.utils import plot_model
 from scipy.misc import imread, imsave, imresize
 from sklearn.cluster import DBSCAN
 from sklearn.model_selection import GroupShuffleSplit
@@ -217,7 +217,7 @@ def init_model(target_num=4, FC_block_num=2, FC_feature_dim=512, dropout_ratio=0
     # Define and compile the model
     model = Model(input_tensor, output_tensor)
     model.compile(optimizer=Adam(lr=learning_rate), loss="mse")
-    plot(model, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "model.png"), show_shapes=True, show_layer_names=True)
+    plot_model(model, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "model.png"), show_shapes=True, show_layer_names=True)
 
     # Load weights if applicable
     if WEIGHTS_FILE_PATH is not None:
