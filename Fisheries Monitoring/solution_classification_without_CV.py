@@ -24,9 +24,11 @@ CROPPED_TEST_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "cropped_test_stg1"
 
 # Output
 OUTPUT_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "{}_output".format(os.path.basename(__file__).split(".")[0]))
-OPTIMAL_WEIGHTS_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "Optimal Weights")
+MODEL_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "model")
+MODEL_STRUCTURE_FILE_PATH = os.path.join(MODEL_FOLDER_PATH, "model.png")
+MODEL_WEIGHTS_FILE_PATH = os.path.join(MODEL_FOLDER_PATH, "model.h5")
 SUBMISSION_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "submission")
-MODEL_NUM = 1
+LOSS_CURVE_FILE_PATH = os.path.join(OUTPUT_FOLDER_PATH, "Loss Curve.png")
 TRIAL_NUM = 10
 
 # Image processing
@@ -62,7 +64,7 @@ def init_model(target_num, additional_block_num=3, additional_filter_num=128, le
     model = Model(input_tensor, output_tensor)
     model.compile(optimizer=Adam(lr=learning_rate), loss="categorical_crossentropy", metrics=["accuracy"])
     model.summary()
-    plot_model(model, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "model.png"), show_shapes=True, show_layer_names=True)
+    plot_model(model, to_file=MODEL_STRUCTURE_FILE_PATH, show_shapes=True, show_layer_names=True)
 
     return model
 
@@ -112,7 +114,7 @@ class InspectLoss(Callback):
         pylab.plot(epoch_index_array, self.train_loss_list, "yellowgreen", label="train_loss")
         pylab.grid()
         pylab.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=1, ncol=1, mode="expand", borderaxespad=0.)
-        pylab.savefig(os.path.join(OUTPUT_FOLDER_PATH, "Loss Curve.png"))
+        pylab.savefig(LOSS_CURVE_FILE_PATH)
         pylab.close()
 
 def ensemble_predictions(submission_folder_path=SUBMISSION_FOLDER_PATH):
@@ -123,7 +125,7 @@ def ensemble_predictions(submission_folder_path=SUBMISSION_FOLDER_PATH):
         ensemble_submission_file_content.to_csv(os.path.join(submission_folder_path, ensemble_submission_file_name), index=False)
 
     # Read predictions
-    submission_file_path_list = glob.glob(os.path.join(submission_folder_path, "model_*_trial_*.csv"))
+    submission_file_path_list = glob.glob(os.path.join(submission_folder_path, "trial_*.csv"))
     print("There are {} submissions in total.".format(len(submission_file_path_list)))
     submission_file_content_list = [pd.read_csv(submission_file_path) for submission_file_path in submission_file_path_list]
     ensemble_submission_file_content = submission_file_content_list[0]
@@ -141,7 +143,7 @@ def ensemble_predictions(submission_folder_path=SUBMISSION_FOLDER_PATH):
 
 def run():
     print("Creating folders ...")
-    os.makedirs(OPTIMAL_WEIGHTS_FOLDER_PATH, exist_ok=True)
+    os.makedirs(MODEL_FOLDER_PATH, exist_ok=True)
     os.makedirs(SUBMISSION_FOLDER_PATH, exist_ok=True)
 
     print("Getting the labels ...")
@@ -149,39 +151,32 @@ def run():
 
     print("Initializing model ...")
     model = init_model(target_num=len(unique_label_list))
-    vanilla_weights = model.get_weights()
 
-    for model_index in np.arange(MODEL_NUM) + 1:
-        print("Working on model {}/{} ...".format(model_index, MODEL_NUM))
+    if not os.path.isfile(MODEL_WEIGHTS_FILE_PATH):
+        print("Performing the training procedure ...")
+        train_generator = load_dataset(CROPPED_TRAIN_FOLDER_PATH, classes=unique_label_list, class_mode="categorical", shuffle=True)
+        customizedstopping_callback = CustomizedStopping()
+        modelcheckpoint_callback = ModelCheckpoint(MODEL_WEIGHTS_FILE_PATH, monitor="loss", save_best_only=True, save_weights_only=True)
+        inspectloss_callback = InspectLoss()
+        model.fit_generator(generator=train_generator,
+                            samples_per_epoch=len(train_generator.filenames),
+                            callbacks=[customizedstopping_callback, modelcheckpoint_callback, inspectloss_callback],
+                            nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
 
-        optimal_weights_file_path = os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "model_{}.h5".format(model_index))
-        if not os.path.isfile(optimal_weights_file_path):
-            print("Performing the training procedure ...")
-            model.set_weights(vanilla_weights)
-            train_generator = load_dataset(CROPPED_TRAIN_FOLDER_PATH, classes=unique_label_list, class_mode="categorical", shuffle=True)
-            customizedstopping_callback = CustomizedStopping()
-            modelcheckpoint_callback = ModelCheckpoint(optimal_weights_file_path, monitor="loss", save_best_only=True, save_weights_only=True)
-            inspectloss_callback = InspectLoss()
-            model.fit_generator(generator=train_generator,
-                                samples_per_epoch=len(train_generator.filenames),
-                                callbacks=[customizedstopping_callback, modelcheckpoint_callback, inspectloss_callback],
-                                nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
+    assert os.path.isfile(MODEL_WEIGHTS_FILE_PATH)
+    model.load_weights(MODEL_WEIGHTS_FILE_PATH)
 
-        assert os.path.isfile(optimal_weights_file_path)
-        model.load_weights(optimal_weights_file_path)
-
-        for trial_index in np.arange(TRIAL_NUM) + 1:
-            print("Working on trial {}/{} ...".format(trial_index, TRIAL_NUM))
-
-            submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "model_{}_trial_{}.csv".format(model_index, trial_index))
-            if not os.path.isfile(submission_file_path):
-                print("Performing the testing procedure ...")
-                test_generator = load_dataset(CROPPED_TEST_FOLDER_PATH, shuffle=False)
-                prediction_array = model.predict_generator(generator=test_generator, val_samples=len(test_generator.filenames))
-                image_name_array = np.expand_dims([os.path.basename(image_path) for image_path in test_generator.filenames], axis=-1)
-                index_array_for_sorting = np.argsort(image_name_array, axis=0)
-                submission_file_content = pd.DataFrame(np.hstack((image_name_array, prediction_array))[index_array_for_sorting.flat])
-                submission_file_content.to_csv(submission_file_path, header=["image"] + unique_label_list, index=False)
+    for trial_index in np.arange(TRIAL_NUM) + 1:
+        print("Working on trial {}/{} ...".format(trial_index, TRIAL_NUM))
+        submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "trial_{}.csv".format(trial_index))
+        if not os.path.isfile(submission_file_path):
+            print("Performing the testing procedure ...")
+            test_generator = load_dataset(CROPPED_TEST_FOLDER_PATH, shuffle=False)
+            prediction_array = model.predict_generator(generator=test_generator, val_samples=len(test_generator.filenames))
+            image_name_array = np.expand_dims([os.path.basename(image_path) for image_path in test_generator.filenames], axis=-1)
+            index_array_for_sorting = np.argsort(image_name_array, axis=0)
+            submission_file_content = pd.DataFrame(np.hstack((image_name_array, prediction_array))[index_array_for_sorting.flat])
+            submission_file_content.to_csv(submission_file_path, header=["image"] + unique_label_list, index=False)
 
     print("Performing ensembling ...")
     ensemble_predictions()
