@@ -6,9 +6,8 @@ import glob
 import shutil
 import pylab
 import numpy as np
-import pandas as pd
 from keras.applications.vgg16 import VGG16
-from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
+from keras.callbacks import Callback, ModelCheckpoint
 from keras.layers import Activation, Input
 from keras.layers.convolutional import Convolution2D
 from keras.layers.normalization import BatchNormalization
@@ -16,7 +15,6 @@ from keras.layers.pooling import GlobalAveragePooling2D
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.preprocessing.image import ImageDataGenerator
-from keras.utils import plot_model
 from scipy.misc import imread, imresize
 from sklearn.cluster import DBSCAN
 from sklearn.model_selection import GroupShuffleSplit
@@ -36,22 +34,19 @@ ACTUAL_CROPPED_VALID_FOLDER_PATH = os.path.join(ACTUAL_DATASET_FOLDER_PATH, "cro
 
 # Output
 OUTPUT_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "{}_output".format(os.path.basename(__file__).split(".")[0]))
-OPTIMAL_WEIGHTS_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "Optimal Weights")
-OPTIMAL_WEIGHTS_FILE_RULE = os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "epoch_{epoch:03d}-loss_{loss:.5f}-val_loss_{val_loss:.5f}.h5")
-SUBMISSION_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "submission")
-TRIAL_NUM = 10
+MODEL_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "model")
+MODEL_STRUCTURE_FILE_PATH = os.path.join(MODEL_FOLDER_PATH, "model.png")
+MODEL_WEIGHTS_FILE_PATH_RULE = os.path.join(MODEL_FOLDER_PATH, "epoch_{epoch:03d}-loss_{loss:.5f}-val_loss_{val_loss:.5f}.h5")
+LOSS_CURVE_FILE_PATH = os.path.join(OUTPUT_FOLDER_PATH, "Loss Curve.png")
 
 # Image processing
 IMAGE_ROW_SIZE = 256
 IMAGE_COLUMN_SIZE = 256
 
 # Training and Testing procedure
-PERFORM_TRAINING = True
-WEIGHTS_FILE_PATH = None
+PREVIOUS_MODEL_WEIGHTS_FILE_PATH = None
 MAXIMUM_EPOCH_NUM = 1000
-PATIENCE = 100
 BATCH_SIZE = 32
-SEED = 0
 
 def perform_CV(image_path_list, resized_image_row_size=64, resized_image_column_size=64):
     if os.path.isfile(CLUSTERING_RESULT_FILE_PATH):
@@ -145,17 +140,15 @@ def init_model(target_num, additional_block_num=3, additional_filter_num=128, le
     model = Model(input_tensor, output_tensor)
     model.compile(optimizer=Adam(lr=learning_rate), loss="categorical_crossentropy", metrics=["accuracy"])
     model.summary()
-    plot_model(model, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "model.png"), show_shapes=True, show_layer_names=True)
 
-    # Load weights if applicable
-    if WEIGHTS_FILE_PATH is not None:
-        assert os.path.isfile(WEIGHTS_FILE_PATH), "Could not find file {}!".format(WEIGHTS_FILE_PATH)
-        print("Loading weights from {} ...".format(WEIGHTS_FILE_PATH))
-        model.load_weights(WEIGHTS_FILE_PATH)
+    if PREVIOUS_MODEL_WEIGHTS_FILE_PATH is not None:
+        assert os.path.isfile(PREVIOUS_MODEL_WEIGHTS_FILE_PATH), "Could not find file {}!".format(PREVIOUS_MODEL_WEIGHTS_FILE_PATH)
+        print("Loading weights from {} ...".format(PREVIOUS_MODEL_WEIGHTS_FILE_PATH))
+        model.load_weights(PREVIOUS_MODEL_WEIGHTS_FILE_PATH)
 
     return model
 
-def load_dataset(folder_path, classes=None, class_mode=None, batch_size=BATCH_SIZE, shuffle=True, seed=None):
+def load_dataset(folder_path, classes=None, class_mode=None, batch_size=BATCH_SIZE, shuffle=True):
     # Get the generator of the dataset
     data_generator_object = ImageDataGenerator(
         rotation_range=10,
@@ -172,8 +165,7 @@ def load_dataset(folder_path, classes=None, class_mode=None, batch_size=BATCH_SI
         classes=classes,
         class_mode=class_mode,
         batch_size=batch_size,
-        shuffle=shuffle,
-        seed=seed)
+        shuffle=shuffle)
 
     return data_generator
 
@@ -196,37 +188,12 @@ class InspectLoss(Callback):
         pylab.plot(epoch_index_array, self.valid_loss_list, "lightskyblue", label="valid_loss")
         pylab.grid()
         pylab.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=2, ncol=2, mode="expand", borderaxespad=0.)
-        pylab.savefig(os.path.join(OUTPUT_FOLDER_PATH, "Loss Curve.png"))
+        pylab.savefig(LOSS_CURVE_FILE_PATH)
         pylab.close()
-
-def ensemble_predictions(submission_folder_path):
-    def _ensemble_predictions(ensemble_func, ensemble_submission_file_name):
-        ensemble_proba = ensemble_func(proba_array, axis=0)
-        ensemble_proba = ensemble_proba / np.sum(ensemble_proba, axis=1)[:, np.newaxis]
-        ensemble_submission_file_content.loc[:, proba_columns] = ensemble_proba
-        ensemble_submission_file_content.to_csv(os.path.join(submission_folder_path, ensemble_submission_file_name), index=False)
-
-    # Read predictions
-    submission_file_path_list = glob.glob(os.path.join(submission_folder_path, "Trial_*.csv"))
-    print("There are {} submissions in total.".format(len(submission_file_path_list)))
-    submission_file_content_list = [pd.read_csv(submission_file_path) for submission_file_path in submission_file_path_list]
-    ensemble_submission_file_content = submission_file_content_list[0]
-
-    # Concatenate predictions
-    proba_columns = ensemble_submission_file_content.columns[1:]
-    proba_list = [np.expand_dims(submission_file_content.as_matrix(proba_columns), axis=0)
-                  for submission_file_content in submission_file_content_list]
-    proba_array = np.vstack(proba_list)
-
-    # Ensemble predictions
-    for ensemble_func, ensemble_submission_file_name in \
-        zip([np.max, np.min, np.mean, np.median], ["max.csv", "min.csv", "mean.csv", "median.csv"]):
-        _ensemble_predictions(ensemble_func, ensemble_submission_file_name)
 
 def run():
     print("Creating folders ...")
-    os.makedirs(OPTIMAL_WEIGHTS_FOLDER_PATH, exist_ok=True)
-    os.makedirs(SUBMISSION_FOLDER_PATH, exist_ok=True)
+    os.makedirs(MODEL_FOLDER_PATH, exist_ok=True)
 
     print("Reorganizing dataset ...")
     train_sample_num, valid_sample_num = reorganize_dataset()
@@ -237,37 +204,17 @@ def run():
     print("Initializing model ...")
     model = init_model(target_num=len(unique_label_list))
 
-    if PERFORM_TRAINING:
-        print("Performing the training procedure ...")
-        train_generator = load_dataset(ACTUAL_CROPPED_TRAIN_FOLDER_PATH, classes=unique_label_list, class_mode="categorical", shuffle=True, seed=SEED)
-        valid_generator = load_dataset(ACTUAL_CROPPED_VALID_FOLDER_PATH, classes=unique_label_list, class_mode="categorical", shuffle=True, seed=SEED)
-        earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
-        modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_RULE, monitor="val_loss", save_best_only=True, save_weights_only=True)
-        inspectloss_callback = InspectLoss()
-        model.fit_generator(generator=train_generator,
-                            samples_per_epoch=train_sample_num,
-                            validation_data=valid_generator,
-                            nb_val_samples=valid_sample_num,
-                            callbacks=[earlystopping_callback, modelcheckpoint_callback, inspectloss_callback],
-                            nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
-    else:
-        assert WEIGHTS_FILE_PATH is not None
-
-        print("Performing the testing procedure ...")
-        for trial_index in np.arange(TRIAL_NUM) + 1:
-            print("Working on trial {}/{} ...".format(trial_index, TRIAL_NUM))
-            submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "Trial_{}.csv".format(trial_index))
-            if not os.path.isfile(submission_file_path):
-                print("Performing the testing procedure ...")
-                test_generator = load_dataset(CROPPED_TEST_FOLDER_PATH, shuffle=False, seed=trial_index)
-                prediction_array = model.predict_generator(generator=test_generator, val_samples=len(test_generator.filenames))
-                image_name_array = np.expand_dims([os.path.basename(image_path) for image_path in test_generator.filenames], axis=-1)
-                index_array_for_sorting = np.argsort(image_name_array, axis=0)
-                submission_file_content = pd.DataFrame(np.hstack((image_name_array, prediction_array))[index_array_for_sorting.flat])
-                submission_file_content.to_csv(submission_file_path, header=["image"] + unique_label_list, index=False)
-
-        print("Performing ensembling ...")
-        ensemble_predictions(SUBMISSION_FOLDER_PATH)
+    print("Performing the training procedure ...")
+    train_generator = load_dataset(ACTUAL_CROPPED_TRAIN_FOLDER_PATH, classes=unique_label_list, class_mode="categorical", shuffle=True)
+    valid_generator = load_dataset(ACTUAL_CROPPED_VALID_FOLDER_PATH, classes=unique_label_list, class_mode="categorical", shuffle=True)
+    modelcheckpoint_callback = ModelCheckpoint(MODEL_WEIGHTS_FILE_PATH_RULE, monitor="val_loss", save_best_only=True, save_weights_only=True)
+    inspectloss_callback = InspectLoss()
+    model.fit_generator(generator=train_generator,
+                        samples_per_epoch=train_sample_num,
+                        validation_data=valid_generator,
+                        nb_val_samples=valid_sample_num,
+                        callbacks=[modelcheckpoint_callback, inspectloss_callback],
+                        nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
 
     print("All done!")
 

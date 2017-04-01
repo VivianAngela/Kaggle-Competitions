@@ -15,7 +15,6 @@ from keras.layers.pooling import GlobalAveragePooling2D
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.preprocessing.image import ImageDataGenerator
-from keras.utils import plot_model
 
 # Dataset
 DATASET_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset/The Nature Conservancy Fisheries Monitoring")
@@ -36,6 +35,7 @@ IMAGE_ROW_SIZE = 256
 IMAGE_COLUMN_SIZE = 256
 
 # Training and Testing procedure
+PREVIOUS_MODEL_WEIGHTS_FILE_PATH = None
 MAXIMUM_EPOCH_NUM = 1000
 LOSS_THRESHOLD = 0.6
 BATCH_SIZE = 32
@@ -64,7 +64,11 @@ def init_model(target_num, additional_block_num=3, additional_filter_num=128, le
     model = Model(input_tensor, output_tensor)
     model.compile(optimizer=Adam(lr=learning_rate), loss="categorical_crossentropy", metrics=["accuracy"])
     model.summary()
-    plot_model(model, to_file=MODEL_STRUCTURE_FILE_PATH, show_shapes=True, show_layer_names=True)
+
+    if PREVIOUS_MODEL_WEIGHTS_FILE_PATH is not None:
+        assert os.path.isfile(PREVIOUS_MODEL_WEIGHTS_FILE_PATH), "Could not find file {}!".format(PREVIOUS_MODEL_WEIGHTS_FILE_PATH)
+        print("Loading weights from {} ...".format(PREVIOUS_MODEL_WEIGHTS_FILE_PATH))
+        model.load_weights(PREVIOUS_MODEL_WEIGHTS_FILE_PATH)
 
     return model
 
