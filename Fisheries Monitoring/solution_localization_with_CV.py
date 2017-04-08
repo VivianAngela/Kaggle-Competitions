@@ -47,12 +47,12 @@ OPTIMAL_WEIGHTS_FILE_RULE = os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "epoch_{ep
 # Image processing
 IMAGE_ROW_SIZE = 256
 IMAGE_COLUMN_SIZE = 256
-CROPPED_IMAGE_ROW_SIZE = 512
-CROPPED_IMAGE_COLUMN_SIZE = 512
+CROPPED_IMAGE_ROW_SIZE = 256
+CROPPED_IMAGE_COLUMN_SIZE = 256
 
 # Training and Testing procedure
-PERFORM_TRAINING = False
-WEIGHTS_FILE_PATH = "/data/Dataset/The Nature Conservancy Fisheries Monitoring/Results/Mar_12/solution_localization_step_4_output/Optimal Weights/epoch_019-loss_0.00573-val_loss_0.00577.h5"
+PERFORM_TRAINING = True
+WEIGHTS_FILE_PATH = None
 MAXIMUM_EPOCH_NUM = 1000
 PATIENCE = 100
 BATCH_SIZE = 32
@@ -200,7 +200,7 @@ def init_model(target_num=4, FC_block_num=2, FC_feature_dim=512, dropout_ratio=0
     input_tensor = Input(shape=(3, IMAGE_ROW_SIZE, IMAGE_COLUMN_SIZE))
 
     # Convolutional blocks
-    pretrained_model = VGG16(include_top=False, weights="imagenet")
+    pretrained_model = VGG16(include_top=False, weights="imagenet", input_shape=input_tensor._keras_shape[1:])
     if freeze_pretrained_model:
         for layer in pretrained_model.layers:
             layer.trainable = False
