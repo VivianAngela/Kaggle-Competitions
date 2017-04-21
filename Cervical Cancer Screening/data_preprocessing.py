@@ -1,97 +1,53 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 import os
-import sys
-import cv2
+import fnmatch
 import numpy as np
+from scipy.misc import imread, imresize, imsave
 
-def usage():
-    if (len(sys.argv) != 2):
-        print('Usage: resize_rotate_imgs.py <TOS_DIR>')
-        sys.exit(3)
+PROJECT_NAME = os.path.basename(os.path.dirname(os.path.realpath(__file__)))
+PROJECT_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset", PROJECT_NAME)
+ORIGINAL_DATASET_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "original")
+PROCESSED_DATASET_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "processed")
+PROCESSED_IMAGE_HEIGHT, PROCESSED_IMAGE_WIDTH = 300, 224
 
-    tos_dir = sys.argv[1]
-    return tos_dir
+def get_certain_files_recursively_within_folder(root_folder_path, file_name_rule):
+    for folder_path, _, file_name_list in os.walk(root_folder_path):
+        for file_name in fnmatch.filter(file_name_list, file_name_rule):
+            yield os.path.join(folder_path, file_name)
 
-# 680 * 512
+def perform_preprocessing(original_image_file_path, processed_image_file_path):
+    try:
+        original_image = imread(original_image_file_path)
+        original_image_height, original_image_width = original_image.shape[:2]
 
-def resize_src_img(img_path):
-    image = cv2.imread(img_path)
-    dim = (680, 512)
-    resized = cv2.resize(image, dim, interpolation=cv2.INTER_LINEAR)
-    name = img_path.split('/')[1 : ][-1]
-    cv2.imwrite(edited_imgs + "/" + name, resized)
-    print("[INFO]: resized image %s" % name)
+        if (PROCESSED_IMAGE_HEIGHT > PROCESSED_IMAGE_WIDTH) != (original_image_height > original_image_width):
+            original_image = np.swapaxes(original_image, 0, 1)
 
+        processed_image_parent_folder_path = os.path.dirname(processed_image_file_path)
+        if not os.path.isdir(processed_image_parent_folder_path):
+            os.makedirs(processed_image_parent_folder_path)
 
-def rotate_src_img(img_path):
-    image = cv2.imread(img_path)
-    height, width = image.shape[ : 2]
-    dim = (680, 512)
-    if width > height:
-        center = (width / 2, height / 2)
-        matrix_2d = cv2.getRotationMatrix2D(center, 90, 1.0)
-        rotated = cv2.warpAffine(image, matrix_2d, (width, height))
-        name = img_path.split('/')[1 : ][-1]
-        cv2.imwrite(edited_imgs + "/" + name, rotated)
-        print("[INFO]: rotated image %s" % name)
+        imsave(processed_image_file_path, imresize(original_image, (PROCESSED_IMAGE_HEIGHT, PROCESSED_IMAGE_WIDTH)))
+        assert os.path.isfile(processed_image_file_path)
+    except Exception as exception:
+        print("[WARNING]: exception for %s: %s" % (original_image_file_path[len(ORIGINAL_DATASET_FOLDER_PATH):], exception))
 
-def rotate_resize_src_img(img_path):
-    image = cv2.imread(img_path)
-    height, width = image.shape[ : 2]
-    dim = (680, 512)
-    if width > height:
-        center = (width / 2, height / 2)
-        matrix_2d = cv2.getRotationMatrix2D(center, 90, 1.0)
-        rotated = cv2.warpAffine(image, matrix_2d, (width, height))
-        resized = cv2.resize(rotated, dim, interpolation=cv2.INTER_LINEAR)
-        name = img_path.split('/')[1 : ][-1]
-        cv2.imwrite(edited_imgs + "/" + name, resized)
-        print("[INFO]: rotated and resized image %s" % name)
-    else:
-        resized = cv2.resize(image, dim, interpolation=cv2.INTER_LINEAR)
-        name = img_path.split('/')[1 : ][-1]
-        cv2.imwrite(edited_imgs + "/" + name, resized)
-        print("[INFO]: resized image %s" % name)
+def run():
+    print("[INFO]: resizing and rotating images ...")
 
-def edit_src_imgs(src_dir):
-    for lists in os.listdir(src_dir):
-        obj = os.path.join(src_dir, lists)
-        if os.path.isdir(obj):
-            edit_src_imgs(obj)
-        else:
-            if obj.endswith(".jpg"):
-                # rotate_src_img(obj)
-                # resize_src_img(obj)
-                rotate_resize_src_img(obj)
-                print("=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=")
+    print("[INFO]: original folder: %s" % ORIGINAL_DATASET_FOLDER_PATH)
+    print("[INFO]: processed folder: %s" % PROCESSED_DATASET_FOLDER_PATH)
 
+    original_image_file_path_list = list(get_certain_files_recursively_within_folder(ORIGINAL_DATASET_FOLDER_PATH, "*.jpg"))
+    for original_image_file_index, original_image_file_path in enumerate(original_image_file_path_list, start=1):
+        print("[INFO]: working on image %s/%s ..." % (original_image_file_index, len(original_image_file_path_list)))
+
+        processed_image_file_path = PROCESSED_DATASET_FOLDER_PATH + original_image_file_path[len(ORIGINAL_DATASET_FOLDER_PATH):]
+        if not os.path.isfile(processed_image_file_path):
+            perform_preprocessing(original_image_file_path, processed_image_file_path)
+
+    print("[INFO]: edited all images, exit!")
 
 if __name__ == "__main__":
-    print("[INFO]: resizing and rotating images")
-    tos_dir = usage()
-    print("[INFO]: tos_dir: %s" % tos_dir)
-    edited_imgs = '../edited_imgs'
-    if os.path.exists(edited_imgs):
-        print("[INFO]: folder of the edited images exists: %s" % edited_imgs)
-    else:
-        try:
-            os.mkdir(edited_imgs)
-            print("[INFO]: created folder %s for the edited images" % edited_imgs)
-        except:
-            print("[ERROR]: Failed to create folder %s for the edited images" % edited_imgs)
-            sys.exit(1)
-
-    try:
-        src_dir = '%s' % tos_dir
-        edit_src_imgs(src_dir)
-    except IOError as detail:
-        print("[ERROR]: ", detail)
-    except ValueError:
-        raise
-    except:
-        raise
-    else:
-        print("[INFO]: edited all images, exit")
+    run()
