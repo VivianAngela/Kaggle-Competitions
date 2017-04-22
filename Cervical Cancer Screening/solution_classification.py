@@ -1,3 +1,5 @@
+from __future__ import absolute_import, division, print_function
+
 import matplotlib
 matplotlib.use("Agg")
 
@@ -15,7 +17,6 @@ from keras.models import Model
 from keras.optimizers import Adam
 from keras.preprocessing.image import ImageDataGenerator
 from keras.utils.visualize_util import plot
-from scipy.misc import imread, imresize
 from sklearn.model_selection import GroupShuffleSplit
 
 # Dataset
@@ -128,6 +129,7 @@ def load_dataset(folder_path, classes=None, class_mode=None, batch_size=BATCH_SI
         shear_range=0.05,
         zoom_range=0.2,
         horizontal_flip=True,
+        vertical_flip=True,
         rescale=1.0 / 255)
     data_generator = data_generator_object.flow_from_directory(
         directory=folder_path,
