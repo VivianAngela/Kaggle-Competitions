@@ -59,12 +59,17 @@ def clean_sentence(original_sentence, result_when_failure="qdkwzo"):
         print("Exception for {}: {}".format(original_sentence, exception))
         return result_when_failure
 
-def load_file(file_path):
-    print("Loading {} ...".format(file_path))
-
-    file_content = pd.read_csv(file_path, encoding="utf-8")
-    file_content["question1"] = file_content["question1"].apply(clean_sentence)
-    file_content["question2"] = file_content["question2"].apply(clean_sentence)
+def load_file(original_file_path):
+    processed_file_path = os.path.join(os.path.dirname(original_file_path), "processed_" + os.path.basename(original_file_path))
+    if os.path.isfile(processed_file_path):
+        print("Loading {} ...".format(processed_file_path))
+        file_content = pd.read_csv(processed_file_path, encoding="utf-8")
+    else:
+        print("Loading {} ...".format(original_file_path))
+        file_content = pd.read_csv(original_file_path, encoding="utf-8")
+        file_content["question1"] = file_content["question1"].apply(clean_sentence)
+        file_content["question2"] = file_content["question2"].apply(clean_sentence)
+        file_content.to_csv(processed_file_path, index=False)
 
     question1_list = file_content["question1"].tolist()
     question2_list = file_content["question2"].tolist()
