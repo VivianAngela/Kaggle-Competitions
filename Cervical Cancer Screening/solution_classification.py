@@ -9,7 +9,7 @@ import shutil
 import pylab
 import numpy as np
 import pandas as pd
-from keras.applications.resnet50 import conv_block, identity_block, preprocess_input, ResNet50, TH_WEIGHTS_PATH
+from keras.applications.resnet50 import conv_block, identity_block, preprocess_input, ResNet50, TH_WEIGHTS_PATH_NO_TOP
 from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
 from keras.layers import Dense, Input, GlobalAveragePooling2D
 from keras.models import Model
@@ -94,7 +94,7 @@ def init_model(image_height=224, image_width=224, unique_label_num=1000, learnin
         model.trainable = trainable
 
     def get_feature_extractor(input_shape):
-        feature_extractor = ResNet50(include_top=True, weights="imagenet", input_shape=input_shape)
+        feature_extractor = ResNet50(include_top=False, weights="imagenet", input_shape=input_shape)
         feature_extractor = Model(input=feature_extractor.input, output=feature_extractor.get_layer("activation_40").output)
         set_model_trainable_properties(feature_extractor, False)
         return feature_extractor
@@ -134,7 +134,7 @@ def init_model(image_height=224, image_width=224, unique_label_num=1000, learnin
     plot(model, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "model.png"), show_shapes=True, show_layer_names=True)
 
     # Load weights for the trainable classifier
-    trainable_classifier.load_weights(os.path.expanduser(os.path.join("~", ".keras/models", TH_WEIGHTS_PATH.split("/")[-1])), by_name=True)
+    trainable_classifier.load_weights(os.path.expanduser(os.path.join("~", ".keras/models", TH_WEIGHTS_PATH_NO_TOP.split("/")[-1])), by_name=True)
 
     # Load weights if applicable
     if WEIGHTS_FILE_PATH is not None:
