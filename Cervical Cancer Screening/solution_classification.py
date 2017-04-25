@@ -167,14 +167,18 @@ def load_dataset(folder_path, classes=None, class_mode=None, batch_size=BATCH_SI
 
     return data_generator
 
-class InspectLoss(Callback):
+class InspectLossAccuracy(Callback):
     def __init__(self):
-        super(InspectLoss, self).__init__()
+        super(InspectLossAccuracy, self).__init__()
 
         self.train_loss_list = []
         self.valid_loss_list = []
 
+        self.train_acc_list = []
+        self.valid_acc_list = []
+
     def on_epoch_end(self, epoch, logs=None):
+        # Loss
         train_loss = logs.get("loss")
         valid_loss = logs.get("val_loss")
         self.train_loss_list.append(train_loss)
@@ -187,6 +191,21 @@ class InspectLoss(Callback):
         pylab.grid()
         pylab.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=2, ncol=2, mode="expand", borderaxespad=0.)
         pylab.savefig(os.path.join(OUTPUT_FOLDER_PATH, "Loss Curve.png"))
+        pylab.close()
+
+        # Accuracy
+        train_acc = logs.get("acc")
+        valid_acc = logs.get("val_acc")
+        self.train_acc_list.append(train_acc)
+        self.valid_acc_list.append(valid_acc)
+        epoch_index_array = np.arange(len(self.train_acc_list)) + 1
+
+        pylab.figure()
+        pylab.plot(epoch_index_array, self.train_acc_list, "yellowgreen", label="train_acc")
+        pylab.plot(epoch_index_array, self.valid_acc_list, "lightskyblue", label="valid_acc")
+        pylab.grid()
+        pylab.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=2, ncol=2, mode="expand", borderaxespad=0.)
+        pylab.savefig(os.path.join(OUTPUT_FOLDER_PATH, "Accuracy Curve.png"))
         pylab.close()
 
 def ensemble_predictions(submission_folder_path):
@@ -233,12 +252,12 @@ def run():
         valid_generator = load_dataset(ACTUAL_VALID_FOLDER_PATH, classes=unique_label_list, class_mode="categorical", shuffle=True, seed=SEED)
         earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
         modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_RULE, monitor="val_loss", save_best_only=True, save_weights_only=True)
-        inspectloss_callback = InspectLoss()
+        inspectlossaccuracy_callback = InspectLossAccuracy()
         model.fit_generator(generator=train_generator,
                             samples_per_epoch=train_sample_num,
                             validation_data=valid_generator,
                             nb_val_samples=valid_sample_num,
-                            callbacks=[earlystopping_callback, modelcheckpoint_callback, inspectloss_callback],
+                            callbacks=[earlystopping_callback, modelcheckpoint_callback, inspectlossaccuracy_callback],
                             nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
     else:
         assert WEIGHTS_FILE_PATH is not None
