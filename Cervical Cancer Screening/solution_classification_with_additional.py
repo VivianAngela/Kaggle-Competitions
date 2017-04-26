@@ -29,8 +29,7 @@ OUTPUT_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "{}_output".format(os.pat
 OPTIMAL_WEIGHTS_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "Optimal Weights")
 OPTIMAL_WEIGHTS_FILE_RULE = os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "epoch_{epoch:03d}-loss_{loss:.5f}-val_loss_{val_loss:.5f}.h5")
 
-# Training and Testing procedure
-PERFORM_TRAINING = True
+# Training procedure
 WEIGHTS_FILE_PATH = None
 MAXIMUM_EPOCH_NUM = 1000
 PATIENCE = 100
@@ -66,7 +65,7 @@ def init_model(image_height=224, image_width=224, unique_label_num=1000, learnin
     input_tensor = Input(shape=(3, image_height, image_width))
 
     # Define the feature extractor
-    feature_extractor = get_feature_extractor(input_shape=input_tensor._keras_shape[1:])
+    feature_extractor = get_feature_extractor(input_shape=input_tensor._keras_shape[1:])  # pylint: disable=W0212
     output_tensor = feature_extractor(input_tensor)
 
     # Define the trainable classifier
