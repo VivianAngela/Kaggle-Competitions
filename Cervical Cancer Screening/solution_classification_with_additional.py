@@ -36,7 +36,7 @@ PATIENCE = 100
 BATCH_SIZE = 32
 SEED = 0
 
-def init_model(image_height=224, image_width=224, unique_label_num=1000, learning_rate=0.0001):
+def init_model(image_height=224, image_width=224, unique_label_num=1000, learning_rate=0.00001):
     def set_model_trainable_properties(model, trainable):
         for layer in model.layers:
             layer.trainable = trainable
