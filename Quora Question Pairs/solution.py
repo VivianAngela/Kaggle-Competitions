@@ -1,12 +1,17 @@
 from __future__ import absolute_import, division, print_function
 
+import matplotlib
+matplotlib.use("Agg")
+
 import os
 import re
+import pylab
 import numpy as np
 import pandas as pd
 from string import punctuation
 from gensim.models import KeyedVectors
 from keras import backend as K
+from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
 from keras.layers import Dense, Dropout, Input, Embedding, Lambda, LSTM, merge
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.normalization import BatchNormalization
@@ -15,6 +20,7 @@ from keras.optimizers import RMSprop
 from keras.preprocessing.sequence import pad_sequences
 from keras.preprocessing.text import Tokenizer
 from keras.utils.visualize_util import plot
+from sklearn.model_selection import StratifiedShuffleSplit
 
 # Dataset
 PROJECT_NAME = "Quora Question Pairs"
@@ -226,6 +232,52 @@ def init_model(embedding_matrix, learning_rate=0.0001):
 
     return model
 
+def divide_dataset(label_array):
+    cv_object = StratifiedShuffleSplit(n_splits=1, test_size=0.2, random_state=0)
+    for train_index_array, valid_index_array in cv_object.split(np.zeros((len(label_array), 1)), label_array):
+        return train_index_array, valid_index_array
+
+class InspectLossAccuracy(Callback):
+    def __init__(self):
+        super(InspectLossAccuracy, self).__init__()
+
+        self.train_loss_list = []
+        self.valid_loss_list = []
+
+        self.train_acc_list = []
+        self.valid_acc_list = []
+
+    def on_epoch_end(self, epoch, logs=None):
+        # Loss
+        train_loss = logs.get("loss")
+        valid_loss = logs.get("val_loss")
+        self.train_loss_list.append(train_loss)
+        self.valid_loss_list.append(valid_loss)
+        epoch_index_array = np.arange(len(self.train_loss_list)) + 1
+
+        pylab.figure()
+        pylab.plot(epoch_index_array, self.train_loss_list, "yellowgreen", label="train_loss")
+        pylab.plot(epoch_index_array, self.valid_loss_list, "lightskyblue", label="valid_loss")
+        pylab.grid()
+        pylab.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=2, ncol=2, mode="expand", borderaxespad=0.)
+        pylab.savefig(os.path.join(OUTPUT_FOLDER_PATH, "Loss Curve.png"))
+        pylab.close()
+
+        # Accuracy
+        train_acc = logs.get("acc")
+        valid_acc = logs.get("val_acc")
+        self.train_acc_list.append(train_acc)
+        self.valid_acc_list.append(valid_acc)
+        epoch_index_array = np.arange(len(self.train_acc_list)) + 1
+
+        pylab.figure()
+        pylab.plot(epoch_index_array, self.train_acc_list, "yellowgreen", label="train_acc")
+        pylab.plot(epoch_index_array, self.valid_acc_list, "lightskyblue", label="valid_acc")
+        pylab.grid()
+        pylab.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=2, ncol=2, mode="expand", borderaxespad=0.)
+        pylab.savefig(os.path.join(OUTPUT_FOLDER_PATH, "Accuracy Curve.png"))
+        pylab.close()
+
 def run():
     print("Creating folders ...")
     os.makedirs(OPTIMAL_WEIGHTS_FOLDER_PATH, exist_ok=True)
@@ -236,6 +288,18 @@ def run():
 
     print("Initializing model ...")
     model = init_model(embedding_matrix)
+
+    print("Dividing dataset ...")
+    train_index_array, valid_index_array = divide_dataset(train_label_array)
+
+    print("Performing the training procedure ...")
+    earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
+    modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_RULE, monitor="val_loss", save_best_only=True, save_weights_only=True)
+    inspectlossaccuracy_callback = InspectLossAccuracy()
+    model.fit([train_data_1_array[train_index_array], train_data_2_array[train_index_array]], train_label_array[train_index_array], batch_size=BATCH_SIZE,
+            validation_data=([train_data_1_array[valid_index_array], train_data_2_array[valid_index_array]], train_label_array[valid_index_array]),
+            callbacks=[earlystopping_callback, modelcheckpoint_callback, inspectlossaccuracy_callback],
+            nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
 
     print("All done!")
 
