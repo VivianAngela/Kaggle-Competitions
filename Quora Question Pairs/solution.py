@@ -12,11 +12,10 @@ from string import punctuation
 from gensim.models import KeyedVectors
 from keras import backend as K
 from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
-from keras.layers import Dense, Dropout, Input, Embedding, Lambda, LSTM, merge
-from keras.layers.advanced_activations import LeakyReLU
+from keras.layers import Dense, Dropout, Embedding, Flatten, Input, LSTM, merge
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
-from keras.optimizers import RMSprop
+from keras.optimizers import Adam
 from keras.preprocessing.sequence import pad_sequences
 from keras.preprocessing.text import Tokenizer
 from keras.utils.visualize_util import plot
@@ -42,7 +41,8 @@ PERFORM_TRAINING = True
 WEIGHTS_FILE_PATH = None
 MAXIMUM_EPOCH_NUM = 1000
 PATIENCE = 100
-BATCH_SIZE = 32
+BATCH_SIZE = 128
+CLASS_WEIGHT = {0:1.309028344, 1:0.472001959}
 
 def clean_sentence(original_sentence, available_vocabulary, result_when_failure="empty"):
     """
@@ -172,11 +172,11 @@ def load_dataset():
 
         return train_data_1_array, train_data_2_array, test_data_1_array, test_data_2_array, train_label_array, embedding_matrix
 
-def init_model(embedding_matrix, learning_rate=0.0001):
+def init_model(embedding_matrix, learning_rate=0.001):
     def get_sentence_feature_extractor(embedding_matrix):
-        input_tensor = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype="int32")
+        input_tensor = Input(shape=(None,), dtype="int32")
         output_tensor = Embedding(input_dim=embedding_matrix.shape[0], output_dim=embedding_matrix.shape[1],
-                                input_length=MAX_SEQUENCE_LENGTH, mask_zero=True, weights=[embedding_matrix], trainable=False)(input_tensor)
+                                input_length=None, mask_zero=True, weights=[embedding_matrix], trainable=False)(input_tensor)
         output_tensor = LSTM(output_dim=256, dropout_W=0.2, dropout_U=0.2, return_sequences=False)(output_tensor)
 
         model = Model(input_tensor, output_tensor)
@@ -184,40 +184,34 @@ def init_model(embedding_matrix, learning_rate=0.0001):
 
     def get_binary_classifier(input_shape):
         input_tensor = Input(shape=input_shape)
-        output_tensor = input_tensor
-        for _ in range(3):
-            output_tensor = Dense(256, activation="linear")(output_tensor)
-            output_tensor = LeakyReLU()(output_tensor)
-            output_tensor = BatchNormalization()(output_tensor)
-            output_tensor = Dropout(0.5)(output_tensor)
+        output_tensor = Dense(256, activation="relu")(input_tensor)
+        output_tensor = BatchNormalization()(output_tensor)
+        output_tensor = Dropout(0.5)(output_tensor)
         output_tensor = Dense(1, activation="sigmoid")(output_tensor)
 
         model = Model(input_tensor, output_tensor)
         return model
 
     # Initiate the input tensors
-    input_1_tensor = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype="int32")
-    input_2_tensor = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype="int32")
+    input_1_tensor = Input(shape=(None,), dtype="int32")
+    input_2_tensor = Input(shape=(None,), dtype="int32")
 
     # Define the sentence feature extractor
     sentence_feature_extractor = get_sentence_feature_extractor(embedding_matrix)
     input_1_feature_tensor = sentence_feature_extractor(input_1_tensor)
     input_2_feature_tensor = sentence_feature_extractor(input_2_tensor)
-    input_1_feature_with_input_2_feature_tensor = merge([input_1_feature_tensor, input_2_feature_tensor], mode="concat", concat_axis=1)
-    input_2_feature_with_input_1_feature_tensor = merge([input_2_feature_tensor, input_1_feature_tensor], mode="concat", concat_axis=1)
+    cos_tensor = merge([input_1_feature_tensor, input_2_feature_tensor], mode="cos")
+    cos_tensor = Flatten()(cos_tensor)
+    mse_tensor = merge([input_1_feature_tensor, input_2_feature_tensor], mode=lambda input_tensor: K.mean(K.square(input_tensor[0] - input_tensor[1]), axis=1, keepdims=True), output_shape=(1,))
+    merged_tensor = merge([cos_tensor, mse_tensor], mode="concat", concat_axis=1)
 
     # Define the binary classifier
-    binary_classifier = get_binary_classifier(input_shape=(input_1_feature_with_input_2_feature_tensor._keras_shape[1],))  # pylint: disable=W0212
-    output_1_tensor = binary_classifier(input_1_feature_with_input_2_feature_tensor)
-    output_2_tensor = binary_classifier(input_2_feature_with_input_1_feature_tensor)
-
-    # Compute the mean value
-    output_tensor = merge([output_1_tensor, output_2_tensor], mode="concat", concat_axis=1)
-    output_tensor = Lambda(lambda x: K.mean(x, axis=1, keepdims=True), output_shape=(1,))(output_tensor)
+    binary_classifier = get_binary_classifier(input_shape=(merged_tensor._keras_shape[1],))  # pylint: disable=W0212
+    output_tensor = binary_classifier(merged_tensor)
 
     # Define the overall model
     model = Model([input_1_tensor, input_2_tensor], output_tensor)
-    model.compile(optimizer=RMSprop(lr=learning_rate), loss="binary_crossentropy", metrics=["accuracy"])
+    model.compile(optimizer=Adam(lr=learning_rate), loss="binary_crossentropy", metrics=["accuracy"])
     model.summary()
 
     # Plot the model structures
@@ -290,18 +284,20 @@ def run():
     print("Initializing model ...")
     model = init_model(embedding_matrix)
 
-    print("Dividing dataset ...")
-    train_index_array, valid_index_array = divide_dataset(train_label_array)
-
     if PERFORM_TRAINING:
+        print("Dividing dataset ...")
+        train_index_array, valid_index_array = divide_dataset(train_label_array)
+
         print("Performing the training procedure ...")
+        valid_sample_weights = np.ones(len(valid_index_array)) * CLASS_WEIGHT[1]
+        valid_sample_weights[np.logical_not(train_label_array[valid_index_array])] = CLASS_WEIGHT[0]
         earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
         modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_RULE, monitor="val_loss", save_best_only=True, save_weights_only=True)
         inspectlossaccuracy_callback = InspectLossAccuracy()
         model.fit([train_data_1_array[train_index_array], train_data_2_array[train_index_array]], train_label_array[train_index_array], batch_size=BATCH_SIZE,
-                validation_data=([train_data_1_array[valid_index_array], train_data_2_array[valid_index_array]], train_label_array[valid_index_array]),
+                validation_data=([train_data_1_array[valid_index_array], train_data_2_array[valid_index_array]], train_label_array[valid_index_array], valid_sample_weights),
                 callbacks=[earlystopping_callback, modelcheckpoint_callback, inspectlossaccuracy_callback],
-                nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
+                class_weight=CLASS_WEIGHT, nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
     else:
         assert WEIGHTS_FILE_PATH is not None
 
