@@ -14,7 +14,9 @@ from keras.models import Model
 from keras.optimizers import RMSprop
 from keras.preprocessing.sequence import pad_sequences
 from keras.preprocessing.text import Tokenizer
+from keras.utils.visualize_util import plot
 
+# Dataset
 PROJECT_NAME = "Quora Question Pairs"
 PROJECT_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset", PROJECT_NAME)
 TRAIN_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "train.csv")
@@ -22,6 +24,18 @@ TEST_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "test.csv")
 EMBEDDING_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "GoogleNews-vectors-negative300.bin")
 DATASET_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "dataset.npz")
 MAX_SEQUENCE_LENGTH = 30
+
+# Output
+OUTPUT_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "{}_output".format(os.path.basename(__file__).split(".")[0]))
+OPTIMAL_WEIGHTS_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "Optimal Weights")
+OPTIMAL_WEIGHTS_FILE_RULE = os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "epoch_{epoch:03d}-loss_{loss:.5f}-val_loss_{val_loss:.5f}.h5")
+SUBMISSION_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "submission")
+
+# Training procedure
+WEIGHTS_FILE_PATH = None
+MAXIMUM_EPOCH_NUM = 1000
+PATIENCE = 100
+BATCH_SIZE = 32
 
 def clean_sentence(original_sentence, available_vocabulary, result_when_failure="empty"):
     """
@@ -199,9 +213,24 @@ def init_model(embedding_matrix, learning_rate=0.0001):
     model.compile(optimizer=RMSprop(lr=learning_rate), loss="binary_crossentropy", metrics=["accuracy"])
     model.summary()
 
+    # Plot the model structures
+    plot(sentence_feature_extractor, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "sentence_feature_extractor.png"), show_shapes=True, show_layer_names=True)
+    plot(binary_classifier, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "binary_classifier.png"), show_shapes=True, show_layer_names=True)
+    plot(model, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "model.png"), show_shapes=True, show_layer_names=True)
+
+    # Load weights if applicable
+    if WEIGHTS_FILE_PATH is not None:
+        assert os.path.isfile(WEIGHTS_FILE_PATH), "Could not find file {}!".format(WEIGHTS_FILE_PATH)
+        print("Loading weights from {} ...".format(WEIGHTS_FILE_PATH))
+        model.load_weights(WEIGHTS_FILE_PATH)
+
     return model
 
 def run():
+    print("Creating folders ...")
+    os.makedirs(OPTIMAL_WEIGHTS_FOLDER_PATH, exist_ok=True)
+    os.makedirs(SUBMISSION_FOLDER_PATH, exist_ok=True)
+
     print("Loading dataset ...")
     train_data_1_array, train_data_2_array, test_data_1_array, test_data_2_array, train_label_array, embedding_matrix = load_dataset()
 
