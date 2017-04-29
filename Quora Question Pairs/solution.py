@@ -6,6 +6,12 @@ import numpy as np
 import pandas as pd
 from string import punctuation
 from gensim.models import KeyedVectors
+from keras import backend as K
+from keras.layers import Dense, Dropout, Input, Embedding, Lambda, LSTM, merge
+from keras.layers.advanced_activations import LeakyReLU
+from keras.layers.normalization import BatchNormalization
+from keras.models import Model
+from keras.optimizers import RMSprop
 from keras.preprocessing.sequence import pad_sequences
 from keras.preprocessing.text import Tokenizer
 
@@ -145,9 +151,62 @@ def load_dataset():
 
         return train_data_1_array, train_data_2_array, test_data_1_array, test_data_2_array, train_label_array, embedding_matrix
 
+def init_model(embedding_matrix, learning_rate=0.0001):
+    def get_sentence_feature_extractor(embedding_matrix):
+        input_tensor = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype="int32")
+        output_tensor = Embedding(input_dim=embedding_matrix.shape[0], output_dim=embedding_matrix.shape[1],
+                                input_length=MAX_SEQUENCE_LENGTH, mask_zero=True, weights=[embedding_matrix], trainable=False)(input_tensor)
+        output_tensor = LSTM(output_dim=256, dropout_W=0.2, dropout_U=0.2, return_sequences=False)(output_tensor)
+
+        model = Model(input_tensor, output_tensor)
+        return model
+
+    def get_binary_classifier(input_shape):
+        input_tensor = Input(shape=input_shape)
+        output_tensor = input_tensor
+        for _ in range(3):
+            output_tensor = Dense(256, activation="linear")(output_tensor)
+            output_tensor = LeakyReLU()(output_tensor)
+            output_tensor = BatchNormalization()(output_tensor)
+            output_tensor = Dropout(0.5)(output_tensor)
+        output_tensor = Dense(1, activation="sigmoid")(output_tensor)
+
+        model = Model(input_tensor, output_tensor)
+        return model
+
+    # Initiate the input tensors
+    input_1_tensor = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype="int32")
+    input_2_tensor = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype="int32")
+
+    # Define the sentence feature extractor
+    sentence_feature_extractor = get_sentence_feature_extractor(embedding_matrix)
+    input_1_feature_tensor = sentence_feature_extractor(input_1_tensor)
+    input_2_feature_tensor = sentence_feature_extractor(input_2_tensor)
+    input_1_feature_with_input_2_feature_tensor = merge([input_1_feature_tensor, input_2_feature_tensor], mode="concat", concat_axis=1)
+    input_2_feature_with_input_1_feature_tensor = merge([input_2_feature_tensor, input_1_feature_tensor], mode="concat", concat_axis=1)
+
+    # Define the binary classifier
+    binary_classifier = get_binary_classifier(input_shape=(input_1_feature_with_input_2_feature_tensor._keras_shape[1],))  # pylint: disable=W0212
+    output_1_tensor = binary_classifier(input_1_feature_with_input_2_feature_tensor)
+    output_2_tensor = binary_classifier(input_2_feature_with_input_1_feature_tensor)
+
+    # Compute the mean value
+    output_tensor = merge([output_1_tensor, output_2_tensor], mode="concat", concat_axis=1)
+    output_tensor = Lambda(lambda x: K.mean(x, axis=1, keepdims=True), output_shape=(1,))(output_tensor)
+
+    # Define the overall model
+    model = Model([input_1_tensor, input_2_tensor], output_tensor)
+    model.compile(optimizer=RMSprop(lr=learning_rate), loss="binary_crossentropy", metrics=["accuracy"])
+    model.summary()
+
+    return model
+
 def run():
     print("Loading dataset ...")
     train_data_1_array, train_data_2_array, test_data_1_array, test_data_2_array, train_label_array, embedding_matrix = load_dataset()
+
+    print("Initializing model ...")
+    model = init_model(embedding_matrix)
 
     print("All done!")
 
