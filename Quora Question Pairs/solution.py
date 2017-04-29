@@ -5,7 +5,7 @@ import re
 import pandas as pd
 from string import punctuation
 
-PROJECT_NAME = os.path.basename(os.path.dirname(os.path.realpath(__file__)))
+PROJECT_NAME = "Quora Question Pairs"
 PROJECT_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset", PROJECT_NAME)
 TRAIN_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "train.csv")
 TEST_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "test.csv")
