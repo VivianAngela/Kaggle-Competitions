@@ -37,7 +37,8 @@ OPTIMAL_WEIGHTS_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "Optimal Weights"
 OPTIMAL_WEIGHTS_FILE_RULE = os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "epoch_{epoch:03d}-loss_{loss:.5f}-val_loss_{val_loss:.5f}.h5")
 SUBMISSION_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "submission")
 
-# Training procedure
+# Training and Testing procedure
+PERFORM_TRAINING = True
 WEIGHTS_FILE_PATH = None
 MAXIMUM_EPOCH_NUM = 1000
 PATIENCE = 100
@@ -292,14 +293,24 @@ def run():
     print("Dividing dataset ...")
     train_index_array, valid_index_array = divide_dataset(train_label_array)
 
-    print("Performing the training procedure ...")
-    earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
-    modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_RULE, monitor="val_loss", save_best_only=True, save_weights_only=True)
-    inspectlossaccuracy_callback = InspectLossAccuracy()
-    model.fit([train_data_1_array[train_index_array], train_data_2_array[train_index_array]], train_label_array[train_index_array], batch_size=BATCH_SIZE,
-            validation_data=([train_data_1_array[valid_index_array], train_data_2_array[valid_index_array]], train_label_array[valid_index_array]),
-            callbacks=[earlystopping_callback, modelcheckpoint_callback, inspectlossaccuracy_callback],
-            nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
+    if PERFORM_TRAINING:
+        print("Performing the training procedure ...")
+        earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
+        modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_RULE, monitor="val_loss", save_best_only=True, save_weights_only=True)
+        inspectlossaccuracy_callback = InspectLossAccuracy()
+        model.fit([train_data_1_array[train_index_array], train_data_2_array[train_index_array]], train_label_array[train_index_array], batch_size=BATCH_SIZE,
+                validation_data=([train_data_1_array[valid_index_array], train_data_2_array[valid_index_array]], train_label_array[valid_index_array]),
+                callbacks=[earlystopping_callback, modelcheckpoint_callback, inspectlossaccuracy_callback],
+                nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
+    else:
+        assert WEIGHTS_FILE_PATH is not None
+
+        print("Performing the testing procedure ...")
+        submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "Aurora.csv")
+        if not os.path.isfile(submission_file_path):
+            prediction_array = model.predict([test_data_1_array, test_data_2_array], batch_size=BATCH_SIZE, verbose=2)
+            submission_file_content = pd.DataFrame({"test_id":np.arange(len(prediction_array)), "is_duplicate":prediction_array.flat})
+            submission_file_content.to_csv(submission_file_path, index=False)
 
     print("All done!")
 
