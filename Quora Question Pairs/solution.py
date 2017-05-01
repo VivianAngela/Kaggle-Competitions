@@ -10,12 +10,11 @@ import numpy as np
 import pandas as pd
 from string import punctuation
 from gensim.models import KeyedVectors
-from keras import backend as K
 from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
-from keras.layers import Dense, Dropout, Embedding, Flatten, Input, LSTM, merge
+from keras.layers import Dense, Dropout, Embedding, Input, LSTM, merge
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
-from keras.optimizers import Adam
+from keras.optimizers import Nadam
 from keras.preprocessing.sequence import pad_sequences
 from keras.preprocessing.text import Tokenizer
 from keras.utils.visualize_util import plot
@@ -172,21 +171,21 @@ def load_dataset():
 
         return train_data_1_array, train_data_2_array, test_data_1_array, test_data_2_array, train_label_array, embedding_matrix
 
-def init_model(embedding_matrix, learning_rate=0.001):
+def init_model(embedding_matrix, learning_rate=0.002):
     def get_sentence_feature_extractor(embedding_matrix):
         input_tensor = Input(shape=(None,), dtype="int32")
         output_tensor = Embedding(input_dim=embedding_matrix.shape[0], output_dim=embedding_matrix.shape[1],
                                 input_length=None, mask_zero=True, weights=[embedding_matrix], trainable=False)(input_tensor)
-        output_tensor = LSTM(output_dim=256, dropout_W=0.2, dropout_U=0.2, return_sequences=False)(output_tensor)
+        output_tensor = LSTM(output_dim=256, dropout_W=0.3, dropout_U=0.3, return_sequences=False)(output_tensor)
 
         model = Model(input_tensor, output_tensor)
         return model
 
     def get_binary_classifier(input_shape):
         input_tensor = Input(shape=input_shape)
-        output_tensor = Dense(256, activation="relu")(input_tensor)
+        output_tensor = Dense(128, activation="relu")(input_tensor)
         output_tensor = BatchNormalization()(output_tensor)
-        output_tensor = Dropout(0.5)(output_tensor)
+        output_tensor = Dropout(0.3)(output_tensor)
         output_tensor = Dense(1, activation="sigmoid")(output_tensor)
 
         model = Model(input_tensor, output_tensor)
@@ -200,10 +199,7 @@ def init_model(embedding_matrix, learning_rate=0.001):
     sentence_feature_extractor = get_sentence_feature_extractor(embedding_matrix)
     input_1_feature_tensor = sentence_feature_extractor(input_1_tensor)
     input_2_feature_tensor = sentence_feature_extractor(input_2_tensor)
-    cos_tensor = merge([input_1_feature_tensor, input_2_feature_tensor], mode="cos")
-    cos_tensor = Flatten()(cos_tensor)
-    mse_tensor = merge([input_1_feature_tensor, input_2_feature_tensor], mode=lambda input_tensor: K.mean(K.square(input_tensor[0] - input_tensor[1]), axis=1, keepdims=True), output_shape=(1,))
-    merged_tensor = merge([cos_tensor, mse_tensor], mode="concat", concat_axis=1)
+    merged_tensor = merge([input_1_feature_tensor, input_2_feature_tensor], mode="concat")
 
     # Define the binary classifier
     binary_classifier = get_binary_classifier(input_shape=(merged_tensor._keras_shape[1],))  # pylint: disable=W0212
@@ -211,7 +207,7 @@ def init_model(embedding_matrix, learning_rate=0.001):
 
     # Define the overall model
     model = Model([input_1_tensor, input_2_tensor], output_tensor)
-    model.compile(optimizer=Adam(lr=learning_rate), loss="binary_crossentropy", metrics=["accuracy"])
+    model.compile(optimizer=Nadam(lr=learning_rate), loss="binary_crossentropy", metrics=["accuracy"])
     model.summary()
 
     # Plot the model structures
@@ -228,9 +224,15 @@ def init_model(embedding_matrix, learning_rate=0.001):
     return model
 
 def divide_dataset(label_array):
-    cv_object = StratifiedShuffleSplit(n_splits=1, test_size=0.2, random_state=0)
+    cv_object = StratifiedShuffleSplit(n_splits=1, test_size=0.1, random_state=0)
     for train_index_array, valid_index_array in cv_object.split(np.zeros((len(label_array), 1)), label_array):
         return train_index_array, valid_index_array
+
+def augment_dataset(data_1_array, data_2_array, label_array):
+    augmented_data_1_array = np.vstack((data_1_array, data_2_array))
+    augmented_data_2_array = np.vstack((data_2_array, data_1_array))
+    augmented_label_array = np.concatenate((label_array, label_array))
+    return augmented_data_1_array, augmented_data_2_array, augmented_label_array
 
 class InspectLossAccuracy(Callback):
     def __init__(self):
@@ -285,17 +287,21 @@ def run():
     model = init_model(embedding_matrix)
 
     if PERFORM_TRAINING:
-        print("Dividing dataset ...")
+        print("Dividing the vanilla training dataset ...")
         train_index_array, valid_index_array = divide_dataset(train_label_array)
 
+        print("Performing data augmentation ...")
+        augmented_train_data_1_array, augmented_train_data_2_array, augmented_train_label_array = augment_dataset(train_data_1_array[train_index_array], train_data_2_array[train_index_array], train_label_array[train_index_array])
+        augmented_valid_data_1_array, augmented_valid_data_2_array, augmented_valid_label_array = augment_dataset(train_data_1_array[valid_index_array], train_data_2_array[valid_index_array], train_label_array[valid_index_array])
+
         print("Performing the training procedure ...")
-        valid_sample_weights = np.ones(len(valid_index_array)) * CLASS_WEIGHT[1]
-        valid_sample_weights[np.logical_not(train_label_array[valid_index_array])] = CLASS_WEIGHT[0]
+        valid_sample_weights = np.ones(len(augmented_valid_label_array)) * CLASS_WEIGHT[1]
+        valid_sample_weights[np.logical_not(augmented_valid_label_array)] = CLASS_WEIGHT[0]
         earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
         modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_RULE, monitor="val_loss", save_best_only=True, save_weights_only=True)
         inspectlossaccuracy_callback = InspectLossAccuracy()
-        model.fit([train_data_1_array[train_index_array], train_data_2_array[train_index_array]], train_label_array[train_index_array], batch_size=BATCH_SIZE,
-                validation_data=([train_data_1_array[valid_index_array], train_data_2_array[valid_index_array]], train_label_array[valid_index_array], valid_sample_weights),
+        model.fit([augmented_train_data_1_array, augmented_train_data_2_array], augmented_train_label_array, batch_size=BATCH_SIZE,
+                validation_data=([augmented_valid_data_1_array, augmented_valid_data_2_array], augmented_valid_label_array, valid_sample_weights),
                 callbacks=[earlystopping_callback, modelcheckpoint_callback, inspectlossaccuracy_callback],
                 class_weight=CLASS_WEIGHT, nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
     else:
@@ -304,7 +310,9 @@ def run():
         print("Performing the testing procedure ...")
         submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "Aurora.csv")
         if not os.path.isfile(submission_file_path):
-            prediction_array = model.predict([test_data_1_array, test_data_2_array], batch_size=BATCH_SIZE, verbose=2)
+            prediction_1_array = model.predict([test_data_1_array, test_data_2_array], batch_size=BATCH_SIZE, verbose=2)
+            prediction_2_array = model.predict([test_data_2_array, test_data_1_array], batch_size=BATCH_SIZE, verbose=2)
+            prediction_array = np.mean(np.hstack((prediction_1_array, prediction_2_array)), axis=1, keepdims=True)
             submission_file_content = pd.DataFrame({"test_id":np.arange(len(prediction_array)), "is_duplicate":prediction_array.flat})
             submission_file_content.to_csv(submission_file_path, index=False)
 
