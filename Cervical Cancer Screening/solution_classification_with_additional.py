@@ -6,6 +6,7 @@ matplotlib.use("Agg")
 import os
 import pylab
 import numpy as np
+from keras import backend as K
 from keras.applications.resnet50 import conv_block, identity_block, preprocess_input, ResNet50, TH_WEIGHTS_PATH_NO_TOP
 from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
 from keras.layers import Dense, Input, GlobalAveragePooling2D
@@ -65,7 +66,7 @@ def init_model(image_height=224, image_width=224, unique_label_num=1000, learnin
     input_tensor = Input(shape=(3, image_height, image_width))
 
     # Define the feature extractor
-    feature_extractor = get_feature_extractor(input_shape=input_tensor._keras_shape[1:])  # pylint: disable=W0212
+    feature_extractor = get_feature_extractor(input_shape=K.int_shape(input_tensor)[1:])
     output_tensor = feature_extractor(input_tensor)
 
     # Define the trainable classifier

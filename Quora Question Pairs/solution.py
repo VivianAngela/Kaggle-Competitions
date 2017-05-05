@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from string import punctuation
 from gensim.models import KeyedVectors
+from keras import backend as K
 from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
 from keras.layers import Dense, Dropout, Embedding, Input, LSTM, merge
 from keras.layers.normalization import BatchNormalization
@@ -202,7 +203,7 @@ def init_model(embedding_matrix, learning_rate=0.002):
     merged_tensor = merge([input_1_feature_tensor, input_2_feature_tensor], mode="concat")
 
     # Define the binary classifier
-    binary_classifier = get_binary_classifier(input_shape=(merged_tensor._keras_shape[1],))  # pylint: disable=W0212
+    binary_classifier = get_binary_classifier(input_shape=(K.int_shape(merged_tensor)[1],))
     output_tensor = binary_classifier(merged_tensor)
 
     # Define the overall model
