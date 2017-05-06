@@ -141,7 +141,7 @@ def load_dataset():
 
         print("Initiating tokenizer ...")
         tokenizer = Tokenizer()
-        tokenizer.fit_on_texts(train_text_1_list + train_text_2_list + test_text_1_list + test_text_2_list)
+        tokenizer.fit_on_texts(train_text_1_list + train_text_2_list)
         print("dataset contains {} unique words.".format(len(tokenizer.word_index)))
 
         print("Turning texts into sequences ...")
