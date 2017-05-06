@@ -165,10 +165,21 @@ def load_dataset():
         embedding_matrix[:, -1] /= np.max(embedding_matrix[:, -1])
         assert np.sum(np.isclose(np.sum(embedding_matrix, axis=1), 0)) == 1
 
+        print("Calculating text frequency ...")
+        unique_text_value_array, unique_text_count_array = np.unique(train_text_1_list + train_text_2_list, return_counts=True)
+        unique_text_count_array = unique_text_count_array.astype(np.float32) / np.max(unique_text_count_array)
+        unique_text_value_to_count_dict = dict(zip(unique_text_value_array, unique_text_count_array))
+        train_frequency_1_array = np.array([unique_text_value_to_count_dict.get(text_value, 0) for text_value in train_text_1_list])
+        train_frequency_2_array = np.array([unique_text_value_to_count_dict.get(text_value, 0) for text_value in train_text_2_list])
+        test_frequency_1_array = np.array([unique_text_value_to_count_dict.get(text_value, 0) for text_value in test_text_1_list])
+        test_frequency_2_array = np.array([unique_text_value_to_count_dict.get(text_value, 0) for text_value in test_text_2_list])
+
         print("Saving dataset to disk ...")
         np.savez_compressed(DATASET_FILE_PATH,
-                            train_data_1_array=train_data_1_array, train_data_2_array=train_data_2_array,
-                            test_data_1_array=test_data_1_array, test_data_2_array=test_data_2_array,
+                            train_data_1_array=train_data_1_array, train_frequency_1_array=train_frequency_1_array,
+                            train_data_2_array=train_data_2_array, train_frequency_2_array=train_frequency_2_array,
+                            test_data_1_array=test_data_1_array, test_frequency_1_array=test_frequency_1_array,
+                            test_data_2_array=test_data_2_array, test_frequency_2_array=test_frequency_2_array,
                             train_label_array=train_label_array, embedding_matrix=embedding_matrix)
 
         return train_data_1_array, train_data_2_array, test_data_1_array, test_data_2_array, train_label_array, embedding_matrix
