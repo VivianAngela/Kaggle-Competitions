@@ -122,13 +122,18 @@ def load_dataset():
         print("Loading dataset from disk ...")
         dataset_file_content = np.load(DATASET_FILE_PATH)
         train_data_1_array = dataset_file_content["train_data_1_array"]
+        train_frequency_1_array = dataset_file_content["train_frequency_1_array"]
         train_data_2_array = dataset_file_content["train_data_2_array"]
+        train_frequency_2_array = dataset_file_content["train_frequency_2_array"]
         test_data_1_array = dataset_file_content["test_data_1_array"]
+        test_frequency_1_array = dataset_file_content["test_frequency_1_array"]
         test_data_2_array = dataset_file_content["test_data_2_array"]
+        test_frequency_2_array = dataset_file_content["test_frequency_2_array"]
         train_label_array = dataset_file_content["train_label_array"]
         embedding_matrix = dataset_file_content["embedding_matrix"]
 
-        return train_data_1_array, train_data_2_array, test_data_1_array, test_data_2_array, train_label_array, embedding_matrix
+        return train_data_1_array, train_frequency_1_array, train_data_2_array, train_frequency_2_array, \
+            test_data_1_array, test_frequency_1_array, test_data_2_array, test_frequency_2_array, train_label_array, embedding_matrix
     else:
         print("Initiating word2vec ...")
         word2vec = KeyedVectors.load_word2vec_format(EMBEDDING_FILE_PATH, binary=True)
@@ -182,7 +187,8 @@ def load_dataset():
                             test_data_2_array=test_data_2_array, test_frequency_2_array=test_frequency_2_array,
                             train_label_array=train_label_array, embedding_matrix=embedding_matrix)
 
-        return train_data_1_array, train_data_2_array, test_data_1_array, test_data_2_array, train_label_array, embedding_matrix
+        return train_data_1_array, train_frequency_1_array, train_data_2_array, train_frequency_2_array, \
+            test_data_1_array, test_frequency_1_array, test_data_2_array, test_frequency_2_array, train_label_array, embedding_matrix
 
 def init_model(embedding_matrix, learning_rate=0.002):
     def get_sentence_feature_extractor(embedding_matrix):
@@ -209,13 +215,17 @@ def init_model(embedding_matrix, learning_rate=0.002):
         return model
 
     # Initiate the input tensors
-    input_1_tensor = Input(shape=(None,), dtype="int32")
-    input_2_tensor = Input(shape=(None,), dtype="int32")
+    input_data_1_tensor = Input(shape=(None,), dtype="int32")
+    input_data_2_tensor = Input(shape=(None,), dtype="int32")
+    input_frequency_1_tensor = Input(shape=(1,))
+    input_frequency_2_tensor = Input(shape=(1,))
 
     # Define the sentence feature extractor
     sentence_feature_extractor = get_sentence_feature_extractor(embedding_matrix)
-    input_1_feature_tensor = sentence_feature_extractor(input_1_tensor)
-    input_2_feature_tensor = sentence_feature_extractor(input_2_tensor)
+    input_1_feature_tensor = sentence_feature_extractor(input_data_1_tensor)
+    input_1_feature_tensor = merge([input_1_feature_tensor, input_frequency_1_tensor], mode="concat")
+    input_2_feature_tensor = sentence_feature_extractor(input_data_2_tensor)
+    input_2_feature_tensor = merge([input_2_feature_tensor, input_frequency_2_tensor], mode="concat")
     merged_tensor = merge([input_1_feature_tensor, input_2_feature_tensor], mode="concat")
 
     # Define the binary classifier
@@ -223,7 +233,7 @@ def init_model(embedding_matrix, learning_rate=0.002):
     output_tensor = binary_classifier(merged_tensor)
 
     # Define the overall model
-    model = Model([input_1_tensor, input_2_tensor], output_tensor)
+    model = Model([input_data_1_tensor, input_data_2_tensor, input_frequency_1_tensor, input_frequency_2_tensor], output_tensor)
     model.compile(optimizer=Nadam(lr=learning_rate), loss="binary_crossentropy", metrics=["accuracy"])
     model.summary()
 
@@ -245,11 +255,13 @@ def divide_dataset(label_array):
     for train_index_array, valid_index_array in cv_object.split(np.zeros((len(label_array), 1)), label_array):
         return train_index_array, valid_index_array
 
-def augment_dataset(data_1_array, data_2_array, label_array):
+def augment_dataset(data_1_array, data_2_array, frequency_1_array, frequency_2_array, label_array):
     augmented_data_1_array = np.vstack((data_1_array, data_2_array))
     augmented_data_2_array = np.vstack((data_2_array, data_1_array))
+    augmented_frequency_1_array = np.concatenate((frequency_1_array, frequency_2_array))
+    augmented_frequency_2_array = np.concatenate((frequency_2_array, frequency_1_array))
     augmented_label_array = np.concatenate((label_array, label_array))
-    return augmented_data_1_array, augmented_data_2_array, augmented_label_array
+    return augmented_data_1_array, augmented_data_2_array, augmented_frequency_1_array, augmented_frequency_2_array, augmented_label_array
 
 class InspectLossAccuracy(Callback):
     def __init__(self):
@@ -298,7 +310,8 @@ def run():
     os.makedirs(SUBMISSION_FOLDER_PATH, exist_ok=True)
 
     print("Loading dataset ...")
-    train_data_1_array, train_data_2_array, test_data_1_array, test_data_2_array, train_label_array, embedding_matrix = load_dataset()
+    train_data_1_array, train_frequency_1_array, train_data_2_array, train_frequency_2_array, \
+        test_data_1_array, test_frequency_1_array, test_data_2_array, test_frequency_2_array, train_label_array, embedding_matrix = load_dataset()
 
     print("Initializing model ...")
     model = init_model(embedding_matrix)
@@ -308,8 +321,10 @@ def run():
         train_index_array, valid_index_array = divide_dataset(train_label_array)
 
         print("Performing data augmentation ...")
-        augmented_train_data_1_array, augmented_train_data_2_array, augmented_train_label_array = augment_dataset(train_data_1_array[train_index_array], train_data_2_array[train_index_array], train_label_array[train_index_array])
-        augmented_valid_data_1_array, augmented_valid_data_2_array, augmented_valid_label_array = augment_dataset(train_data_1_array[valid_index_array], train_data_2_array[valid_index_array], train_label_array[valid_index_array])
+        augmented_train_data_1_array, augmented_train_data_2_array, augmented_train_frequency_1_array, augmented_train_frequency_2_array, augmented_train_label_array = augment_dataset(
+            train_data_1_array[train_index_array], train_data_2_array[train_index_array], train_frequency_1_array[train_index_array], train_frequency_2_array[train_index_array], train_label_array[train_index_array])
+        augmented_valid_data_1_array, augmented_valid_data_2_array, augmented_valid_frequency_1_array, augmented_valid_frequency_2_array, augmented_valid_label_array = augment_dataset(
+            train_data_1_array[valid_index_array], train_data_2_array[valid_index_array], train_frequency_1_array[valid_index_array], train_frequency_2_array[valid_index_array], train_label_array[valid_index_array])
 
         print("Performing the training procedure ...")
         valid_sample_weights = np.ones(len(augmented_valid_label_array)) * CLASS_WEIGHT[1]
@@ -317,8 +332,8 @@ def run():
         earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
         modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_RULE, monitor="val_loss", save_best_only=True, save_weights_only=True)
         inspectlossaccuracy_callback = InspectLossAccuracy()
-        model.fit([augmented_train_data_1_array, augmented_train_data_2_array], augmented_train_label_array, batch_size=BATCH_SIZE,
-                validation_data=([augmented_valid_data_1_array, augmented_valid_data_2_array], augmented_valid_label_array, valid_sample_weights),
+        model.fit([augmented_train_data_1_array, augmented_train_data_2_array, augmented_train_frequency_1_array, augmented_train_frequency_2_array], augmented_train_label_array, batch_size=BATCH_SIZE,
+                validation_data=([augmented_valid_data_1_array, augmented_valid_data_2_array, augmented_valid_frequency_1_array, augmented_valid_frequency_2_array], augmented_valid_label_array, valid_sample_weights),
                 callbacks=[earlystopping_callback, modelcheckpoint_callback, inspectlossaccuracy_callback],
                 class_weight=CLASS_WEIGHT, nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
     else:
@@ -327,8 +342,8 @@ def run():
         print("Performing the testing procedure ...")
         submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "Aurora.csv")
         if not os.path.isfile(submission_file_path):
-            prediction_1_array = model.predict([test_data_1_array, test_data_2_array], batch_size=BATCH_SIZE, verbose=2)
-            prediction_2_array = model.predict([test_data_2_array, test_data_1_array], batch_size=BATCH_SIZE, verbose=2)
+            prediction_1_array = model.predict([test_data_1_array, test_data_2_array, test_frequency_1_array, test_frequency_2_array], batch_size=BATCH_SIZE, verbose=2)
+            prediction_2_array = model.predict([test_data_2_array, test_data_1_array, test_frequency_2_array, test_frequency_1_array], batch_size=BATCH_SIZE, verbose=2)
             prediction_array = np.mean(np.hstack((prediction_1_array, prediction_2_array)), axis=1, keepdims=True)
             submission_file_content = pd.DataFrame({"test_id":np.arange(len(prediction_array)), "is_duplicate":prediction_array.flat})
             submission_file_content.to_csv(submission_file_path, index=False)
