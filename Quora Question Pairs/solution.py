@@ -41,7 +41,7 @@ PERFORM_TRAINING = True
 WEIGHTS_FILE_PATH = None
 MAXIMUM_EPOCH_NUM = 1000
 PATIENCE = 100
-BATCH_SIZE = 128
+BATCH_SIZE = 1024
 CLASS_WEIGHT = {0:1.309028344, 1:0.472001959}
 
 def clean_sentence(original_sentence, available_vocabulary, result_when_failure="empty"):
@@ -177,16 +177,20 @@ def init_model(embedding_matrix, learning_rate=0.002):
         input_tensor = Input(shape=(None,), dtype="int32")
         output_tensor = Embedding(input_dim=embedding_matrix.shape[0], output_dim=embedding_matrix.shape[1],
                                 input_length=None, mask_zero=True, weights=[embedding_matrix], trainable=False)(input_tensor)
-        output_tensor = LSTM(output_dim=256, dropout_W=0.3, dropout_U=0.3, return_sequences=False)(output_tensor)
+        output_tensor = LSTM(output_dim=256, dropout_W=0.2, dropout_U=0.2, activation="tanh", return_sequences=False)(output_tensor)
+        output_tensor = BatchNormalization()(output_tensor)
+        output_tensor = Dropout(0.2)(output_tensor)
 
         model = Model(input_tensor, output_tensor)
         return model
 
-    def get_binary_classifier(input_shape):
+    def get_binary_classifier(input_shape, vanilla_dense_size=256, block_num=3):
         input_tensor = Input(shape=input_shape)
-        output_tensor = Dense(128, activation="relu")(input_tensor)
-        output_tensor = BatchNormalization()(output_tensor)
-        output_tensor = Dropout(0.3)(output_tensor)
+        output_tensor = input_tensor
+        for block_index in np.arange(block_num):
+            output_tensor = Dense(int(vanilla_dense_size / (2 ** block_index)), activation="relu")(output_tensor)
+            output_tensor = BatchNormalization()(output_tensor)
+            output_tensor = Dropout(0.2)(output_tensor)
         output_tensor = Dense(1, activation="sigmoid")(output_tensor)
 
         model = Model(input_tensor, output_tensor)
@@ -225,7 +229,7 @@ def init_model(embedding_matrix, learning_rate=0.002):
     return model
 
 def divide_dataset(label_array):
-    cv_object = StratifiedShuffleSplit(n_splits=1, test_size=0.1, random_state=0)
+    cv_object = StratifiedShuffleSplit(n_splits=1, test_size=0.2, random_state=0)
     for train_index_array, valid_index_array in cv_object.split(np.zeros((len(label_array), 1)), label_array):
         return train_index_array, valid_index_array
 
