@@ -192,11 +192,10 @@ def load_dataset():
         train_label_array = np.array(train_label_list, dtype=np.bool)
 
         print("Initiating embedding matrix ...")
-        embedding_matrix = np.zeros((len(tokenizer.word_index) + 1, word2vec.vector_size + 1), dtype=np.float32)
+        embedding_matrix = np.zeros((len(tokenizer.word_index) + 1, word2vec.vector_size), dtype=np.float32)
         for word, index in tokenizer.word_index.items():
             assert word in word_to_index_dict
-            embedding_matrix[index] = word2vec.word_vec(word).tolist() + [tokenizer.word_counts[word]]
-        embedding_matrix[:, -1] /= np.max(embedding_matrix[:, -1])
+            embedding_matrix[index] = word2vec.word_vec(word)
         assert np.sum(np.isclose(np.sum(embedding_matrix, axis=1), 0)) == 1
 
         print("Calculating text frequency ...")
