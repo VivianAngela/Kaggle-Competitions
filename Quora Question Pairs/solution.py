@@ -128,7 +128,7 @@ def clean_sentence(original_sentence, word_to_index_dict, known_typo_dict, resul
         print("Exception for {}: {}".format(original_sentence, exception))
         return result_when_failure
 
-def load_file(original_file_path, word_to_index_dict, known_typo_dict):
+def load_file(original_file_path, word_to_index_dict, known_typo_dict, unique_text_value_to_frequency_dict):
     processed_file_path = os.path.join(os.path.dirname(original_file_path), "processed_" + os.path.basename(original_file_path))
     if os.path.isfile(processed_file_path):
         print("Loading {} ...".format(processed_file_path))
@@ -136,17 +136,38 @@ def load_file(original_file_path, word_to_index_dict, known_typo_dict):
     else:
         print("Loading {} ...".format(original_file_path))
         file_content = pd.read_csv(original_file_path, encoding="utf-8")
-        file_content["question1"] = file_content["question1"].apply(lambda original_sentence: clean_sentence(original_sentence, word_to_index_dict, known_typo_dict))
-        file_content["question2"] = file_content["question2"].apply(lambda original_sentence: clean_sentence(original_sentence, word_to_index_dict, known_typo_dict))
+
+        if len(unique_text_value_to_frequency_dict) == 0:
+            print("Calculating text value to frequency dictionary ...")
+            unique_text_value_array, unique_text_count_array = np.unique(file_content["question1"].tolist() + file_content["question2"].tolist(), return_counts=True)
+            unique_text_frequency_array = unique_text_count_array.astype(np.float32) / np.max(unique_text_count_array)
+            unique_text_value_to_frequency_dict.update(dict(zip(unique_text_value_array, unique_text_frequency_array)))
+
+        print("Generating frequency columns ...")
+        file_content["question1_frequency"] = file_content["question1"].apply(lambda text_value: unique_text_value_to_frequency_dict.get(text_value, 0))
+        file_content["question2_frequency"] = file_content["question2"].apply(lambda text_value: unique_text_value_to_frequency_dict.get(text_value, 0))
+
+        print("Cleaning sentences ...")
+        file_content["processed_question1"] = file_content["question1"].apply(lambda original_sentence: clean_sentence(original_sentence, word_to_index_dict, known_typo_dict))
+        file_content["processed_question2"] = file_content["question2"].apply(lambda original_sentence: clean_sentence(original_sentence, word_to_index_dict, known_typo_dict))
+
+        print("Saving processed file ...")
+        interesting_column_name_list = ["processed_question1", "processed_question2", "question1_frequency", "question2_frequency"]
+        if "is_duplicate" in file_content.columns:
+            interesting_column_name_list.append("is_duplicate")
+        file_content = file_content[interesting_column_name_list]
         file_content.to_csv(processed_file_path, index=False)
 
-    question1_list = file_content["question1"].tolist()
-    question2_list = file_content["question2"].tolist()
+    question1_text_list = file_content["processed_question1"].tolist()
+    question2_text_list = file_content["processed_question2"].tolist()
+    question1_frequency_list = file_content["question1_frequency"].tolist()
+    question2_frequency_list = file_content["question2_frequency"].tolist()
+
     if "is_duplicate" in file_content.columns:
         is_duplicate_list = file_content["is_duplicate"].tolist()
-        return question1_list, question2_list, is_duplicate_list
+        return question1_text_list, question2_text_list, question1_frequency_list, question2_frequency_list, is_duplicate_list
     else:
-        return question1_list, question2_list
+        return question1_text_list, question2_text_list, question1_frequency_list, question2_frequency_list
 
 def load_dataset():
     if os.path.isfile(DATASET_FILE_PATH):
@@ -173,13 +194,14 @@ def load_dataset():
 
         print("Loading text files ...")
         known_typo_dict = {}
-        train_text_1_list, train_text_2_list, train_label_list = load_file(TRAIN_FILE_PATH, word_to_index_dict, known_typo_dict)
-        test_text_1_list, test_text_2_list = load_file(TEST_FILE_PATH, word_to_index_dict, known_typo_dict)
+        unique_text_value_to_frequency_dict = {}
+        train_text_1_list, train_text_2_list, train_frequency_1_list, train_frequency_2_list, train_label_list = load_file(TRAIN_FILE_PATH, word_to_index_dict, known_typo_dict, unique_text_value_to_frequency_dict)
+        test_text_1_list, test_text_2_list, test_frequency_1_list, test_frequency_2_list = load_file(TEST_FILE_PATH, word_to_index_dict, known_typo_dict, unique_text_value_to_frequency_dict)
 
         print("Initiating tokenizer ...")
         tokenizer = Tokenizer()
         tokenizer.fit_on_texts(train_text_1_list + train_text_2_list)
-        print("dataset contains {} unique words.".format(len(tokenizer.word_index)))
+        print("Dataset contains {} unique words.".format(len(tokenizer.word_index)))
 
         print("Turning texts into sequences ...")
         train_sequence_1_list = tokenizer.texts_to_sequences(train_text_1_list)
@@ -192,7 +214,6 @@ def load_dataset():
         train_data_2_array = pad_sequences(train_sequence_2_list, maxlen=MAX_SEQUENCE_LENGTH, padding="post", truncating="post")
         test_data_1_array = pad_sequences(test_sequence_1_list, maxlen=MAX_SEQUENCE_LENGTH, padding="post", truncating="post")
         test_data_2_array = pad_sequences(test_sequence_2_list, maxlen=MAX_SEQUENCE_LENGTH, padding="post", truncating="post")
-        train_label_array = np.array(train_label_list, dtype=np.bool)
 
         print("Initiating embedding matrix ...")
         embedding_matrix = np.zeros((len(tokenizer.word_index) + 1, word2vec.vector_size), dtype=np.float32)
@@ -201,14 +222,12 @@ def load_dataset():
             embedding_matrix[index] = word2vec.word_vec(word)
         assert np.sum(np.isclose(np.sum(embedding_matrix, axis=1), 0)) == 1
 
-        print("Calculating text frequency ...")
-        unique_text_value_array, unique_text_count_array = np.unique(train_text_1_list + train_text_2_list, return_counts=True)
-        unique_text_count_array = unique_text_count_array.astype(np.float32) / np.max(unique_text_count_array)
-        unique_text_value_to_count_dict = dict(zip(unique_text_value_array, unique_text_count_array))
-        train_frequency_1_array = np.array([unique_text_value_to_count_dict.get(text_value, 0) for text_value in train_text_1_list])
-        train_frequency_2_array = np.array([unique_text_value_to_count_dict.get(text_value, 0) for text_value in train_text_2_list])
-        test_frequency_1_array = np.array([unique_text_value_to_count_dict.get(text_value, 0) for text_value in test_text_1_list])
-        test_frequency_2_array = np.array([unique_text_value_to_count_dict.get(text_value, 0) for text_value in test_text_2_list])
+        print("Converting to numpy array ...")
+        train_frequency_1_array = np.array(train_frequency_1_list)
+        train_frequency_2_array = np.array(train_frequency_2_list)
+        train_label_array = np.array(train_label_list, dtype=np.bool)
+        test_frequency_1_array = np.array(test_frequency_1_list)
+        test_frequency_2_array = np.array(test_frequency_2_list)
 
         print("Saving dataset to disk ...")
         np.savez_compressed(DATASET_FILE_PATH,
