@@ -12,7 +12,7 @@ from string import ascii_lowercase, punctuation
 from gensim.models import KeyedVectors
 from keras import backend as K
 from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
-from keras.layers import Dense, Dropout, Embedding, Input, LSTM, merge
+from keras.layers import Dense, Dropout, Embedding, Input, Lambda, LSTM, merge
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
 from keras.optimizers import Nadam
@@ -41,7 +41,7 @@ PERFORM_TRAINING = True
 WEIGHTS_FILE_PATH = None
 MAXIMUM_EPOCH_NUM = 1000
 PATIENCE = 100
-BATCH_SIZE = 1024
+BATCH_SIZE = 256
 CLASS_WEIGHT = {0:1.309028344, 1:0.472001959}
 
 def correct_typo(word, word_to_index_dict, known_typo_dict, min_word_length=5):
@@ -276,11 +276,15 @@ def init_model(embedding_matrix, learning_rate=0.002):
     input_1_feature_tensor = merge([input_1_feature_tensor, input_frequency_1_tensor], mode="concat")
     input_2_feature_tensor = sentence_feature_extractor(input_data_2_tensor)
     input_2_feature_tensor = merge([input_2_feature_tensor, input_frequency_2_tensor], mode="concat")
-    merged_tensor = merge([input_1_feature_tensor, input_2_feature_tensor], mode="concat")
+    merged_feature_1_tensor = merge([input_1_feature_tensor, input_2_feature_tensor], mode="concat")
+    merged_feature_2_tensor = merge([input_2_feature_tensor, input_1_feature_tensor], mode="concat")
 
     # Define the binary classifier
-    binary_classifier = get_binary_classifier(input_shape=(K.int_shape(merged_tensor)[1],))
-    output_tensor = binary_classifier(merged_tensor)
+    binary_classifier = get_binary_classifier(input_shape=(K.int_shape(merged_feature_1_tensor)[1],))
+    output_1_tensor = binary_classifier(merged_feature_1_tensor)
+    output_2_tensor = binary_classifier(merged_feature_2_tensor)
+    output_tensor = merge([output_1_tensor, output_2_tensor], mode="concat", concat_axis=1)
+    output_tensor = Lambda(lambda x: K.mean(x, axis=1, keepdims=True), output_shape=(1,))(output_tensor)
 
     # Define the overall model
     model = Model([input_data_1_tensor, input_data_2_tensor, input_frequency_1_tensor, input_frequency_2_tensor], output_tensor)
@@ -304,14 +308,6 @@ def divide_dataset(label_array):
     cv_object = StratifiedShuffleSplit(n_splits=1, test_size=0.2, random_state=0)
     for train_index_array, valid_index_array in cv_object.split(np.zeros((len(label_array), 1)), label_array):
         return train_index_array, valid_index_array
-
-def augment_dataset(data_1_array, data_2_array, frequency_1_array, frequency_2_array, label_array):
-    augmented_data_1_array = np.vstack((data_1_array, data_2_array))
-    augmented_data_2_array = np.vstack((data_2_array, data_1_array))
-    augmented_frequency_1_array = np.concatenate((frequency_1_array, frequency_2_array))
-    augmented_frequency_2_array = np.concatenate((frequency_2_array, frequency_1_array))
-    augmented_label_array = np.concatenate((label_array, label_array))
-    return augmented_data_1_array, augmented_data_2_array, augmented_frequency_1_array, augmented_frequency_2_array, augmented_label_array
 
 class InspectLossAccuracy(Callback):
     def __init__(self):
@@ -370,20 +366,14 @@ def run():
         print("Dividing the vanilla training dataset ...")
         train_index_array, valid_index_array = divide_dataset(train_label_array)
 
-        print("Performing data augmentation ...")
-        augmented_train_data_1_array, augmented_train_data_2_array, augmented_train_frequency_1_array, augmented_train_frequency_2_array, augmented_train_label_array = augment_dataset(
-            train_data_1_array[train_index_array], train_data_2_array[train_index_array], train_frequency_1_array[train_index_array], train_frequency_2_array[train_index_array], train_label_array[train_index_array])
-        augmented_valid_data_1_array, augmented_valid_data_2_array, augmented_valid_frequency_1_array, augmented_valid_frequency_2_array, augmented_valid_label_array = augment_dataset(
-            train_data_1_array[valid_index_array], train_data_2_array[valid_index_array], train_frequency_1_array[valid_index_array], train_frequency_2_array[valid_index_array], train_label_array[valid_index_array])
-
         print("Performing the training procedure ...")
-        valid_sample_weights = np.ones(len(augmented_valid_label_array)) * CLASS_WEIGHT[1]
-        valid_sample_weights[np.logical_not(augmented_valid_label_array)] = CLASS_WEIGHT[0]
+        valid_sample_weights = np.ones(len(valid_index_array)) * CLASS_WEIGHT[1]
+        valid_sample_weights[np.logical_not(train_label_array[valid_index_array])] = CLASS_WEIGHT[0]
         earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
         modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_RULE, monitor="val_loss", save_best_only=True, save_weights_only=True)
         inspectlossaccuracy_callback = InspectLossAccuracy()
-        model.fit([augmented_train_data_1_array, augmented_train_data_2_array, augmented_train_frequency_1_array, augmented_train_frequency_2_array], augmented_train_label_array, batch_size=BATCH_SIZE,
-                validation_data=([augmented_valid_data_1_array, augmented_valid_data_2_array, augmented_valid_frequency_1_array, augmented_valid_frequency_2_array], augmented_valid_label_array, valid_sample_weights),
+        model.fit([train_data_1_array[train_index_array], train_data_2_array[train_index_array], train_frequency_1_array[train_index_array], train_frequency_2_array[train_index_array]], train_label_array[train_index_array], batch_size=BATCH_SIZE,
+                validation_data=([train_data_1_array[valid_index_array], train_data_2_array[valid_index_array], train_frequency_1_array[valid_index_array], train_frequency_2_array[valid_index_array]], train_label_array[valid_index_array], valid_sample_weights),
                 callbacks=[earlystopping_callback, modelcheckpoint_callback, inspectlossaccuracy_callback],
                 class_weight=CLASS_WEIGHT, nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
     else:
@@ -392,9 +382,7 @@ def run():
         print("Performing the testing procedure ...")
         submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "Aurora.csv")
         if not os.path.isfile(submission_file_path):
-            prediction_1_array = model.predict([test_data_1_array, test_data_2_array, test_frequency_1_array, test_frequency_2_array], batch_size=BATCH_SIZE, verbose=2)
-            prediction_2_array = model.predict([test_data_2_array, test_data_1_array, test_frequency_2_array, test_frequency_1_array], batch_size=BATCH_SIZE, verbose=2)
-            prediction_array = np.mean(np.hstack((prediction_1_array, prediction_2_array)), axis=1, keepdims=True)
+            prediction_array = model.predict([test_data_1_array, test_data_2_array, test_frequency_1_array, test_frequency_2_array], batch_size=BATCH_SIZE, verbose=2)
             submission_file_content = pd.DataFrame({"test_id":np.arange(len(prediction_array)), "is_duplicate":prediction_array.flat})
             submission_file_content.to_csv(submission_file_path, index=False)
 
