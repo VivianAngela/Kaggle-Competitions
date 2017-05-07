@@ -8,7 +8,7 @@ import re
 import pylab
 import numpy as np
 import pandas as pd
-from string import punctuation
+from string import ascii_lowercase, punctuation
 from gensim.models import KeyedVectors
 from keras import backend as K
 from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
@@ -44,7 +44,34 @@ PATIENCE = 100
 BATCH_SIZE = 1024
 CLASS_WEIGHT = {0:1.309028344, 1:0.472001959}
 
-def clean_sentence(original_sentence, available_vocabulary, result_when_failure="empty"):
+def correct_typo(word, word_to_index_dict, known_typo_dict):
+    def get_candidate_word_list(word):
+        # https://www.kaggle.com/cpmpml/spell-checker-using-word2vec/notebook
+        left_word_with_right_word_list = [(word[:index], word[index:]) for index in range(len(word) + 1)]
+        deleted_word_list = [left_word + right_word[1:] for left_word, right_word in left_word_with_right_word_list if right_word]
+        transposed_word_list = [left_word + right_word[1] + right_word[0] + right_word[2:] for left_word, right_word in left_word_with_right_word_list if len(right_word) > 1]
+        replaced_word_list = [left_word + character + right_word[1:] for left_word, right_word in left_word_with_right_word_list if right_word for character in ascii_lowercase]
+        inserted_word_list = [left_word + character + right_word for left_word, right_word in left_word_with_right_word_list for character in ascii_lowercase]
+        return list(set(deleted_word_list + transposed_word_list + replaced_word_list + inserted_word_list))
+
+    if word in word_to_index_dict:
+        return word
+
+    if word in known_typo_dict:
+        return known_typo_dict[word]
+
+    candidate_word_list = get_candidate_word_list(word)
+    candidate_word_with_index_array = np.array([(candidate_word, word_to_index_dict[candidate_word]) for candidate_word in candidate_word_list if candidate_word in word_to_index_dict])
+    if len(candidate_word_with_index_array) == 0:
+        selected_candidate_word = ""
+    else:
+        selected_candidate_word = candidate_word_with_index_array[np.argmin(candidate_word_with_index_array[:, -1].astype(np.int))][0]
+        print("Replacing {} with {} ...".format(word, selected_candidate_word))
+
+    known_typo_dict[word] = selected_candidate_word
+    return selected_candidate_word
+
+def clean_sentence(original_sentence, word_to_index_dict, known_typo_dict, result_when_failure="empty"):
     """
         https://www.kaggle.com/currie32/quora-question-pairs/the-importance-of-cleaning-text
     """
@@ -86,8 +113,9 @@ def clean_sentence(original_sentence, available_vocabulary, result_when_failure=
         # Remove punctuation
         cleaned_sentence = "".join([character for character in cleaned_sentence if character not in punctuation])
 
-        # Remove words that are not in vocabulary
-        cleaned_sentence = " ".join([word for word in cleaned_sentence.split() if word in available_vocabulary])
+        # Correct simple typos
+        cleaned_sentence = " ".join([correct_typo(word, word_to_index_dict, known_typo_dict) for word in cleaned_sentence.split()])
+        cleaned_sentence = " ".join([word for word in cleaned_sentence.split()])
 
         # Check the length of the cleaned sentence
         assert cleaned_sentence
@@ -97,7 +125,7 @@ def clean_sentence(original_sentence, available_vocabulary, result_when_failure=
         print("Exception for {}: {}".format(original_sentence, exception))
         return result_when_failure
 
-def load_file(original_file_path, available_vocabulary):
+def load_file(original_file_path, word_to_index_dict, known_typo_dict):
     processed_file_path = os.path.join(os.path.dirname(original_file_path), "processed_" + os.path.basename(original_file_path))
     if os.path.isfile(processed_file_path):
         print("Loading {} ...".format(processed_file_path))
@@ -105,8 +133,8 @@ def load_file(original_file_path, available_vocabulary):
     else:
         print("Loading {} ...".format(original_file_path))
         file_content = pd.read_csv(original_file_path, encoding="utf-8")
-        file_content["question1"] = file_content["question1"].apply(lambda original_sentence: clean_sentence(original_sentence, available_vocabulary))
-        file_content["question2"] = file_content["question2"].apply(lambda original_sentence: clean_sentence(original_sentence, available_vocabulary))
+        file_content["question1"] = file_content["question1"].apply(lambda original_sentence: clean_sentence(original_sentence, word_to_index_dict, known_typo_dict))
+        file_content["question2"] = file_content["question2"].apply(lambda original_sentence: clean_sentence(original_sentence, word_to_index_dict, known_typo_dict))
         file_content.to_csv(processed_file_path, index=False)
 
     question1_list = file_content["question1"].tolist()
@@ -137,12 +165,13 @@ def load_dataset():
     else:
         print("Initiating word2vec ...")
         word2vec = KeyedVectors.load_word2vec_format(EMBEDDING_FILE_PATH, binary=True)
-        available_vocabulary = word2vec.vocab
-        print("word2vec contains {} unique words.".format(len(available_vocabulary)))
+        word_to_index_dict = dict([(word, index) for index, word in enumerate(word2vec.index2word)])
+        print("word2vec contains {} unique words.".format(len(word_to_index_dict)))
 
         print("Loading text files ...")
-        train_text_1_list, train_text_2_list, train_label_list = load_file(TRAIN_FILE_PATH, available_vocabulary)
-        test_text_1_list, test_text_2_list = load_file(TEST_FILE_PATH, available_vocabulary)
+        known_typo_dict = {}
+        train_text_1_list, train_text_2_list, train_label_list = load_file(TRAIN_FILE_PATH, word_to_index_dict, known_typo_dict)
+        test_text_1_list, test_text_2_list = load_file(TEST_FILE_PATH, word_to_index_dict, known_typo_dict)
 
         print("Initiating tokenizer ...")
         tokenizer = Tokenizer()
@@ -165,7 +194,7 @@ def load_dataset():
         print("Initiating embedding matrix ...")
         embedding_matrix = np.zeros((len(tokenizer.word_index) + 1, word2vec.vector_size + 1), dtype=np.float32)
         for word, index in tokenizer.word_index.items():
-            assert word in available_vocabulary
+            assert word in word_to_index_dict
             embedding_matrix[index] = word2vec.word_vec(word).tolist() + [tokenizer.word_counts[word]]
         embedding_matrix[:, -1] /= np.max(embedding_matrix[:, -1])
         assert np.sum(np.isclose(np.sum(embedding_matrix, axis=1), 0)) == 1
