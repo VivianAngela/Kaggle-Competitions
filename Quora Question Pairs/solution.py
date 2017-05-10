@@ -44,7 +44,7 @@ PATIENCE = 100
 BATCH_SIZE = 256
 CLASS_WEIGHT = {0:1.309028344, 1:0.472001959}
 
-def correct_typo(word, word_to_index_dict, known_typo_dict, min_word_length=5):
+def correct_typo(word, word_to_index_dict, known_typo_dict, min_word_length=8):
     def get_candidate_word_list(word):
         # https://www.kaggle.com/cpmpml/spell-checker-using-word2vec/notebook
         left_word_with_right_word_list = [(word[:index], word[index:]) for index in range(len(word) + 1)]
