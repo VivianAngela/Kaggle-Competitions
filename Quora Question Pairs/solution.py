@@ -6,11 +6,9 @@ matplotlib.use("Agg")
 import os
 import re
 import pylab
-import networkx as nx
 import numpy as np
 import pandas as pd
 from gensim.models import KeyedVectors
-from itertools import combinations, product
 from string import ascii_lowercase, punctuation
 from keras import backend as K
 from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
@@ -279,120 +277,12 @@ def init_model(embedding_matrix, learning_rate=0.002):
 
     return model
 
-def get_replaceable_candidates(G, node):
-    own_self = set((node,))
-    if G.has_node(node):
-        return nx.descendants(G, node).union(own_self)
-    else:
-        return own_self
-
-def get_unique_rows(a):
-    # http://stackoverflow.com/questions/31097247/remove-duplicate-rows-of-a-numpy-array
-    a = np.ascontiguousarray(a)
-    unique_a = np.unique(a.view([("", a.dtype)] * a.shape[1]))
-    return unique_a.view(a.dtype).reshape((unique_a.shape[0], a.shape[1]))
-
-def get_different_row(a1, a2):
-    # http://stackoverflow.com/questions/11903083/find-the-set-difference-between-two-large-arrays-matrices-in-python
-    a1, a2 = np.array(a1), np.array(a2)
-    a1_rows = a1.view([("", a1.dtype)] * a1.shape[1])
-    a2_rows = a2.view([("", a2.dtype)] * a2.shape[1])
-    return np.setdiff1d(a1_rows, a2_rows).view(a1.dtype).reshape(-1, a1.shape[1])
-
-def divide_dataset(data_1_array, data_2_array, label_array, apply_data_augmentation=True, validation_split=0.2, random_seed=0):
-    if not apply_data_augmentation:
-        print("Dividing dataset without data augmentation ...")
-        cv_object = StratifiedShuffleSplit(n_splits=1, test_size=validation_split, random_state=random_seed)
-        for train_index_array, valid_index_array in cv_object.split(np.zeros((len(label_array), 1)), label_array):
-            return data_1_array[train_index_array], data_2_array[train_index_array], label_array[train_index_array], \
-                data_1_array[valid_index_array], data_2_array[valid_index_array], label_array[valid_index_array]
-
-    print("Dividing dataset with data augmentation ...")
-    np.random.seed(random_seed)
-    select_for_validation = lambda : np.random.rand() <= validation_split
-
-    # Read file content
-    file_content = pd.read_csv(TRAIN_FILE_PATH, encoding="utf-8")
-    id_with_label_array = file_content[["qid1", "qid2", "is_duplicate"]].as_matrix()
-
-    # Load given duplicate question pairs in an undirected graph
-    graph_for_duplicate_question_pairs = nx.Graph()
-    for qid1, qid2, is_duplicate in id_with_label_array:
-        if is_duplicate:
-            graph_for_duplicate_question_pairs.add_edge(qid1, qid2)
-
-    # Generate all duplicate question pairs
-    train_nodes = set()
-    valid_nodes = set()
-    train_duplicate_question_pairs_list = []
-    valid_duplicate_question_pairs_list = []
-    for subgraph in nx.connected_component_subgraphs(graph_for_duplicate_question_pairs):
-        sorted_nodes = sorted(subgraph.nodes())
-        if select_for_validation():
-            valid_nodes.update(sorted_nodes)
-            for sorted_qid_pairs in combinations(sorted_nodes, 2):
-                valid_duplicate_question_pairs_list.append(sorted_qid_pairs)
-        else:
-            train_nodes.update(sorted_nodes)
-            for sorted_qid_pairs in combinations(sorted_nodes, 2):
-                train_duplicate_question_pairs_list.append(sorted_qid_pairs)
-    print("The number of duplicate samples changes from {} to {}.".format(np.sum(id_with_label_array[:, -1] == 1),
-                    len(train_duplicate_question_pairs_list) + len(valid_duplicate_question_pairs_list)))
-
-    # Generate all non-duplicate question pairs
-    train_non_duplicate_question_pairs_list = []
-    valid_non_duplicate_question_pairs_list = []
-    for qid1, qid2, is_duplicate in id_with_label_array:
-        if not is_duplicate:
-            qid1_candidates = get_replaceable_candidates(graph_for_duplicate_question_pairs, qid1)
-            qid2_candidates = get_replaceable_candidates(graph_for_duplicate_question_pairs, qid2)
-            for qid_pairs in product(qid1_candidates, qid2_candidates):
-                sorted_qid_pairs = sorted(qid_pairs)
-                if sorted_qid_pairs[0] in train_nodes and sorted_qid_pairs[1] in train_nodes:
-                    train_non_duplicate_question_pairs_list.append(sorted_qid_pairs)
-                elif sorted_qid_pairs[0] in valid_nodes and sorted_qid_pairs[1] in valid_nodes:
-                    valid_non_duplicate_question_pairs_list.append(sorted_qid_pairs)
-                elif select_for_validation():
-                    valid_non_duplicate_question_pairs_list.append(sorted_qid_pairs)
-                else:
-                    train_non_duplicate_question_pairs_list.append(sorted_qid_pairs)
-    train_non_duplicate_question_pairs_list = get_unique_rows(train_non_duplicate_question_pairs_list).tolist()
-    valid_non_duplicate_question_pairs_list = get_unique_rows(valid_non_duplicate_question_pairs_list).tolist()
-    valid_non_duplicate_question_pairs_list = get_different_row(valid_non_duplicate_question_pairs_list, train_non_duplicate_question_pairs_list).tolist()
-    print("The number of non-duplicate samples changes from {} to {}.".format(np.sum(id_with_label_array[:, -1] == 0),
-                    len(train_non_duplicate_question_pairs_list) + len(valid_non_duplicate_question_pairs_list)))
-
-    print("Mapping ID to data ...")
-    data_array = np.vstack((data_1_array, data_2_array))
-    id_array = np.hstack((id_with_label_array[:, 0], id_with_label_array[:, 1]))
-    unique_id_array, unique_id_index = np.unique(id_array, return_index=True)
-    unique_data_array = data_array[unique_id_index]
-    id_to_data_dict = dict(zip(unique_id_array, unique_data_array))
-
-    print("Generating actual training dataset ...")
-    actual_train_data_1_list, actual_train_data_2_list, actual_train_label_list = [], [], []
-    for qid1, qid2 in train_duplicate_question_pairs_list:
-        actual_train_data_1_list.append(id_to_data_dict[qid1])
-        actual_train_data_2_list.append(id_to_data_dict[qid2])
-        actual_train_label_list.append(True)
-    for qid1, qid2 in train_non_duplicate_question_pairs_list:
-        actual_train_data_1_list.append(id_to_data_dict[qid1])
-        actual_train_data_2_list.append(id_to_data_dict[qid2])
-        actual_train_label_list.append(False)
-
-    print("Generating actual validation dataset ...")
-    actual_valid_data_1_list, actual_valid_data_2_list, actual_valid_label_list = [], [], []
-    for qid1, qid2 in valid_duplicate_question_pairs_list:
-        actual_valid_data_1_list.append(id_to_data_dict[qid1])
-        actual_valid_data_2_list.append(id_to_data_dict[qid2])
-        actual_valid_label_list.append(True)
-    for qid1, qid2 in valid_non_duplicate_question_pairs_list:
-        actual_valid_data_1_list.append(id_to_data_dict[qid1])
-        actual_valid_data_2_list.append(id_to_data_dict[qid2])
-        actual_valid_label_list.append(False)
-
-    return np.array(actual_train_data_1_list), np.array(actual_train_data_2_list), np.array(actual_train_label_list), \
-    np.array(actual_valid_data_1_list), np.array(actual_valid_data_2_list), np.array(actual_valid_label_list)
+def divide_dataset(data_1_array, data_2_array, label_array, validation_split=0.2):
+    print("Dividing dataset ...")
+    cv_object = StratifiedShuffleSplit(n_splits=1, test_size=validation_split, random_state=0)
+    for train_index_array, valid_index_array in cv_object.split(np.zeros((len(label_array), 1)), label_array):
+        return data_1_array[train_index_array], data_2_array[train_index_array], label_array[train_index_array], \
+            data_1_array[valid_index_array], data_2_array[valid_index_array], label_array[valid_index_array]
 
 class InspectLossAccuracy(Callback):
     def __init__(self):
