@@ -41,7 +41,7 @@ PERFORM_TRAINING = True
 WEIGHTS_FILE_PATH = None
 MAXIMUM_EPOCH_NUM = 1000
 PATIENCE = 100
-BATCH_SIZE = 256
+BATCH_SIZE = 2048
 TARGET_MEAN_PREDICTION = 0.175  # https://www.kaggle.com/davidthaler/how-many-1-s-are-in-the-public-lb
 
 def correct_typo(word, word_to_index_dict, known_typo_dict, min_word_length=8):
@@ -222,20 +222,18 @@ def init_model(embedding_matrix, learning_rate=0.002):
         input_tensor = Input(shape=(None,), dtype="int32")
         output_tensor = Embedding(input_dim=embedding_matrix.shape[0], output_dim=embedding_matrix.shape[1],
                                 input_length=None, mask_zero=True, weights=[embedding_matrix], trainable=False)(input_tensor)
-        output_tensor = LSTM(output_dim=256, dropout_W=0.2, dropout_U=0.2, activation="tanh", return_sequences=False)(output_tensor)
+        output_tensor = LSTM(output_dim=256, dropout_W=0.3, dropout_U=0.3, activation="tanh", return_sequences=False)(output_tensor)
         output_tensor = BatchNormalization()(output_tensor)
-        output_tensor = Dropout(0.2)(output_tensor)
+        output_tensor = Dropout(0.3)(output_tensor)
 
         model = Model(input_tensor, output_tensor)
         return model
 
-    def get_binary_classifier(input_shape, vanilla_dense_size=256, block_num=3):
+    def get_binary_classifier(input_shape):
         input_tensor = Input(shape=input_shape)
-        output_tensor = input_tensor
-        for block_index in np.arange(block_num):
-            output_tensor = Dense(int(vanilla_dense_size / (2 ** block_index)), activation="relu")(output_tensor)
-            output_tensor = BatchNormalization()(output_tensor)
-            output_tensor = Dropout(0.2)(output_tensor)
+        output_tensor = Dense(128, activation="relu")(input_tensor)
+        output_tensor = BatchNormalization()(output_tensor)
+        output_tensor = Dropout(0.3)(output_tensor)
         output_tensor = Dense(1, activation="sigmoid")(output_tensor)
 
         model = Model(input_tensor, output_tensor)
