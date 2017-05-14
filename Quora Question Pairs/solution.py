@@ -19,7 +19,7 @@ from keras.optimizers import Nadam
 from keras.preprocessing.sequence import pad_sequences
 from keras.preprocessing.text import Tokenizer
 from keras.utils.visualize_util import plot
-from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.model_selection import StratifiedKFold
 
 # Dataset
 PROJECT_NAME = "Quora Question Pairs"
@@ -33,15 +33,14 @@ MAX_SEQUENCE_LENGTH = 30
 # Output
 OUTPUT_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "{}_output".format(os.path.basename(__file__).split(".")[0]))
 OPTIMAL_WEIGHTS_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "Optimal Weights")
-OPTIMAL_WEIGHTS_FILE_RULE = os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "epoch_{epoch:03d}-loss_{loss:.5f}-val_loss_{val_loss:.5f}.h5")
-SUBMISSION_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "submission")
+SUBMISSION_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "Submission")
 
 # Training and Testing procedure
-PERFORM_TRAINING = True
-WEIGHTS_FILE_PATH = None
-MAXIMUM_EPOCH_NUM = 1000
-PATIENCE = 100
+SPLIT_NUM = 10
+RANDOM_STATE = 666666
+PATIENCE = 4
 BATCH_SIZE = 2048
+MAXIMUM_EPOCH_NUM = 1000
 TARGET_MEAN_PREDICTION = 0.175  # https://www.kaggle.com/davidthaler/how-many-1-s-are-in-the-public-lb
 
 def correct_typo(word, word_to_index_dict, known_typo_dict, min_word_length=8):
@@ -267,24 +266,12 @@ def init_model(embedding_matrix, learning_rate=0.002):
     plot(binary_classifier, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "binary_classifier.png"), show_shapes=True, show_layer_names=True)
     plot(model, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "model.png"), show_shapes=True, show_layer_names=True)
 
-    # Load weights if applicable
-    if WEIGHTS_FILE_PATH is not None:
-        assert os.path.isfile(WEIGHTS_FILE_PATH), "Could not find file {}!".format(WEIGHTS_FILE_PATH)
-        print("Loading weights from {} ...".format(WEIGHTS_FILE_PATH))
-        model.load_weights(WEIGHTS_FILE_PATH)
-
     return model
 
-def divide_dataset(data_1_array, data_2_array, label_array, validation_split=0.1):
-    print("Dividing dataset ...")
-    cv_object = StratifiedShuffleSplit(n_splits=1, test_size=validation_split, random_state=0)
-    for train_index_array, valid_index_array in cv_object.split(np.zeros((len(label_array), 1)), label_array):
-        return data_1_array[train_index_array], data_2_array[train_index_array], label_array[train_index_array], \
-            data_1_array[valid_index_array], data_2_array[valid_index_array], label_array[valid_index_array]
-
 class InspectLossAccuracy(Callback):
-    def __init__(self):
-        super(InspectLossAccuracy, self).__init__()
+    def __init__(self, *args, **kwargs):
+        self.split_index = kwargs.pop("split_index", None)
+        super(InspectLossAccuracy, self).__init__(*args, **kwargs)
 
         self.train_loss_list = []
         self.valid_loss_list = []
@@ -305,7 +292,7 @@ class InspectLossAccuracy(Callback):
         pylab.plot(epoch_index_array, self.valid_loss_list, "lightskyblue", label="valid_loss")
         pylab.grid()
         pylab.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=2, ncol=2, mode="expand", borderaxespad=0.)
-        pylab.savefig(os.path.join(OUTPUT_FOLDER_PATH, "Loss Curve.png"))
+        pylab.savefig(os.path.join(OUTPUT_FOLDER_PATH, "loss_curve_{}.png".format(self.split_index)))
         pylab.close()
 
         # Accuracy
@@ -320,7 +307,7 @@ class InspectLossAccuracy(Callback):
         pylab.plot(epoch_index_array, self.valid_acc_list, "lightskyblue", label="valid_acc")
         pylab.grid()
         pylab.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=2, ncol=2, mode="expand", borderaxespad=0.)
-        pylab.savefig(os.path.join(OUTPUT_FOLDER_PATH, "Accuracy Curve.png"))
+        pylab.savefig(os.path.join(OUTPUT_FOLDER_PATH, "accuracy_curve_{}.png".format(self.split_index)))
         pylab.close()
 
 def run():
@@ -333,37 +320,52 @@ def run():
 
     print("Initializing model ...")
     model = init_model(embedding_matrix)
+    vanilla_weights = model.get_weights()
 
-    if PERFORM_TRAINING:
-        print("Dividing the vanilla training dataset ...")
-        actual_train_data_1_array, actual_train_data_2_array, actual_train_label_array, \
-        actual_valid_data_1_array, actual_valid_data_2_array, actual_valid_label_array = divide_dataset(train_data_1_array, train_data_2_array, train_label_array)
+    cv_object = StratifiedKFold(n_splits=SPLIT_NUM, random_state=RANDOM_STATE)
+    for split_index, (train_index_array, valid_index_array) in enumerate(cv_object.split(np.zeros((len(train_label_array), 1)), train_label_array), start=1):
+        print("Working on splitting fold {} ...".format(split_index))
 
-        print("Calculating class weight ...")
-        train_mean_prediction = np.mean(actual_train_label_array)
-        train_class_weight = {0: (1 - TARGET_MEAN_PREDICTION) / (1 - train_mean_prediction), 1: TARGET_MEAN_PREDICTION / train_mean_prediction}
-        valid_mean_prediction = np.mean(actual_valid_label_array)
-        valid_class_weight = {0: (1 - TARGET_MEAN_PREDICTION) / (1 - valid_mean_prediction), 1: TARGET_MEAN_PREDICTION / valid_mean_prediction}
+        submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "submission_{}.csv".format(split_index))
+        if os.path.isfile(submission_file_path):
+            print("The submission file already exists.")
+            continue
 
-        print("Performing the training procedure ...")
-        valid_sample_weights = np.ones(len(actual_valid_label_array)) * valid_class_weight[1]
-        valid_sample_weights[np.logical_not(actual_valid_label_array)] = valid_class_weight[0]
-        earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
-        modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_RULE, monitor="val_loss", save_best_only=True, save_weights_only=True)
-        inspectlossaccuracy_callback = InspectLossAccuracy()
-        model.fit([actual_train_data_1_array, actual_train_data_2_array], actual_train_label_array, batch_size=BATCH_SIZE,
-                validation_data=([actual_valid_data_1_array, actual_valid_data_2_array], actual_valid_label_array, valid_sample_weights),
-                callbacks=[earlystopping_callback, modelcheckpoint_callback, inspectlossaccuracy_callback],
-                class_weight=train_class_weight, nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
-    else:
-        assert WEIGHTS_FILE_PATH is not None
+        optimal_weights_file_path = os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "optimal_weights_{}.h5".format(split_index))
+        if os.path.isfile(optimal_weights_file_path):
+            print("The optimal weights file already exists.")
+        else:
+            print("Dividing the vanilla training dataset to actual training/validation dataset ...")
+            actual_train_data_1_array, actual_train_data_2_array, actual_train_label_array = train_data_1_array[train_index_array], train_data_2_array[train_index_array], train_label_array[train_index_array]
+            actual_valid_data_1_array, actual_valid_data_2_array, actual_valid_label_array = train_data_1_array[valid_index_array], train_data_2_array[valid_index_array], train_label_array[valid_index_array]
+
+            print("Calculating class weight ...")
+            train_mean_prediction = np.mean(actual_train_label_array)
+            train_class_weight = {0: (1 - TARGET_MEAN_PREDICTION) / (1 - train_mean_prediction), 1: TARGET_MEAN_PREDICTION / train_mean_prediction}
+            valid_mean_prediction = np.mean(actual_valid_label_array)
+            valid_class_weight = {0: (1 - TARGET_MEAN_PREDICTION) / (1 - valid_mean_prediction), 1: TARGET_MEAN_PREDICTION / valid_mean_prediction}
+
+            print("Startting with vanilla weights ...")
+            model.set_weights(vanilla_weights)
+
+            print("Performing the training procedure ...")
+            valid_sample_weights = np.ones(len(actual_valid_label_array)) * valid_class_weight[1]
+            valid_sample_weights[np.logical_not(actual_valid_label_array)] = valid_class_weight[0]
+            earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
+            modelcheckpoint_callback = ModelCheckpoint(optimal_weights_file_path, monitor="val_loss", save_best_only=True, save_weights_only=True)
+            inspectlossaccuracy_callback = InspectLossAccuracy(split_index)
+            model.fit([actual_train_data_1_array, actual_train_data_2_array], actual_train_label_array, batch_size=BATCH_SIZE,
+                    validation_data=([actual_valid_data_1_array, actual_valid_data_2_array], actual_valid_label_array, valid_sample_weights),
+                    callbacks=[earlystopping_callback, modelcheckpoint_callback, inspectlossaccuracy_callback],
+                    class_weight=train_class_weight, nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
+
+        assert os.path.isfile(optimal_weights_file_path)
+        model.load_weights(optimal_weights_file_path)
 
         print("Performing the testing procedure ...")
-        submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "Aurora.csv")
-        if not os.path.isfile(submission_file_path):
-            prediction_array = model.predict([test_data_1_array, test_data_2_array], batch_size=BATCH_SIZE, verbose=2)
-            submission_file_content = pd.DataFrame({"test_id":np.arange(len(prediction_array)), "is_duplicate":prediction_array.flat})
-            submission_file_content.to_csv(submission_file_path, index=False)
+        prediction_array = model.predict([test_data_1_array, test_data_2_array], batch_size=BATCH_SIZE, verbose=2)
+        submission_file_content = pd.DataFrame({"test_id":np.arange(len(prediction_array)), "is_duplicate":prediction_array.flat})
+        submission_file_content.to_csv(submission_file_path, index=False)
 
     print("All done!")
 
