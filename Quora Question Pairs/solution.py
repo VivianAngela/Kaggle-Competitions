@@ -5,6 +5,7 @@ matplotlib.use("Agg")
 
 import os
 import re
+import glob
 import pylab
 import numpy as np
 import pandas as pd
@@ -310,6 +311,22 @@ class InspectLossAccuracy(Callback):
         pylab.savefig(os.path.join(OUTPUT_FOLDER_PATH, "accuracy_curve_{}.png".format(self.split_index)))
         pylab.close()
 
+def ensemble_predictions(submission_folder_path, proba_column_name):
+    # Read predictions
+    submission_file_path_list = glob.glob(os.path.join(submission_folder_path, "submission_*.csv"))
+    submission_file_content_list = [pd.read_csv(submission_file_path) for submission_file_path in submission_file_path_list]
+    ensemble_submission_file_content = submission_file_content_list[0]
+    print("There are {} submissions in total.".format(len(submission_file_path_list)))
+
+    # Concatenate predictions
+    proba_array = np.array([submission_file_content[proba_column_name].as_matrix() for submission_file_content in submission_file_content_list])
+
+    # Ensemble predictions
+    for ensemble_func, ensemble_submission_file_name in zip([np.max, np.min, np.mean, np.median], ["max.csv", "min.csv", "mean.csv", "median.csv"]):
+        ensemble_submission_file_path = os.path.join(submission_folder_path, os.pardir, ensemble_submission_file_name)
+        ensemble_submission_file_content[proba_column_name] = ensemble_func(proba_array, axis=0)
+        ensemble_submission_file_content.to_csv(ensemble_submission_file_path, index=False)
+
 def run():
     print("Creating folders ...")
     os.makedirs(OPTIMAL_WEIGHTS_FOLDER_PATH, exist_ok=True)
@@ -366,6 +383,9 @@ def run():
         prediction_array = model.predict([test_data_1_array, test_data_2_array], batch_size=BATCH_SIZE, verbose=2)
         submission_file_content = pd.DataFrame({"test_id":np.arange(len(prediction_array)), "is_duplicate":np.squeeze(prediction_array)})
         submission_file_content.to_csv(submission_file_path, index=False)
+
+    print("Performing ensembling ...")
+    ensemble_predictions(submission_folder_path=SUBMISSION_FOLDER_PATH, proba_column_name="is_duplicate")
 
     print("All done!")
 
