@@ -275,7 +275,7 @@ def init_model(embedding_matrix, learning_rate=0.002):
 
     return model
 
-def divide_dataset(data_1_array, data_2_array, label_array, validation_split=0.2):
+def divide_dataset(data_1_array, data_2_array, label_array, validation_split=0.1):
     print("Dividing dataset ...")
     cv_object = StratifiedShuffleSplit(n_splits=1, test_size=validation_split, random_state=0)
     for train_index_array, valid_index_array in cv_object.split(np.zeros((len(label_array), 1)), label_array):
