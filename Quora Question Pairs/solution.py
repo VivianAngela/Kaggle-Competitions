@@ -364,7 +364,7 @@ def run():
 
         print("Performing the testing procedure ...")
         prediction_array = model.predict([test_data_1_array, test_data_2_array], batch_size=BATCH_SIZE, verbose=2)
-        submission_file_content = pd.DataFrame({"test_id":np.arange(len(prediction_array)), "is_duplicate":prediction_array.flat})
+        submission_file_content = pd.DataFrame({"test_id":np.arange(len(prediction_array)), "is_duplicate":np.squeeze(prediction_array)})
         submission_file_content.to_csv(submission_file_path, index=False)
 
     print("All done!")
