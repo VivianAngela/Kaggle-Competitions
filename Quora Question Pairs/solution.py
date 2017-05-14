@@ -157,69 +157,19 @@ def load_file(original_file_path, word_to_index_dict, known_typo_dict):
     else:
         return question1_text_list, question2_text_list
 
-def get_frequency_array():
-    def get_id_to_frequency_dict(pandas_series_list):
-        id_list = []
-        for pandas_series in pandas_series_list:
-            id_list += pandas_series.tolist()
-
-        id_value_array, id_count_array = np.unique(id_list, return_counts=True)
-        id_frequency_array = id_count_array / np.max(id_count_array)
-        return dict(zip(id_value_array, id_frequency_array))
-
-    print("Loading text files ...")
-    train_file_content = pd.read_csv(TRAIN_FILE_PATH, encoding="utf-8")
-    test_file_content = pd.read_csv(TEST_FILE_PATH, encoding="utf-8")
-
-    print("Getting one ID for each unique question ...")
-    all_question_list = train_file_content["question1"].tolist() + train_file_content["question2"].tolist() + \
-        test_file_content["question1"].tolist() + test_file_content["question2"].tolist()
-    all_unique_question_list = list(set(all_question_list))
-    question_to_id_dict = pd.Series(range(len(all_unique_question_list)), index=all_unique_question_list).to_dict()
-
-    print("Converting to question ID ...")
-    train_file_content["qid1"] = train_file_content["question1"].map(question_to_id_dict)
-    train_file_content["qid2"] = train_file_content["question2"].map(question_to_id_dict)
-    test_file_content["qid1"] = test_file_content["question1"].map(question_to_id_dict)
-    test_file_content["qid2"] = test_file_content["question2"].map(question_to_id_dict)
-
-    print("Calculating frequencies ...")
-    test_id_to_frequency_dict = get_id_to_frequency_dict([test_file_content["qid1"], test_file_content["qid2"]])
-    train_and_test_id_to_frequency_dict = get_id_to_frequency_dict([train_file_content["qid1"], train_file_content["qid2"], test_file_content["qid1"], test_file_content["qid2"]])
-    train_file_content["data_1_frequency_in_test"] = train_file_content["qid1"].map(lambda qid: test_id_to_frequency_dict.get(qid, 0))
-    train_file_content["data_2_frequency_in_test"] = train_file_content["qid2"].map(lambda qid: test_id_to_frequency_dict.get(qid, 0))
-    train_file_content["data_1_frequency_in_train_and_test"] = train_file_content["qid1"].map(lambda qid: train_and_test_id_to_frequency_dict.get(qid, 0))
-    train_file_content["data_2_frequency_in_train_and_test"] = train_file_content["qid2"].map(lambda qid: train_and_test_id_to_frequency_dict.get(qid, 0))
-    test_file_content["data_1_frequency_in_test"] = test_file_content["qid1"].map(lambda qid: test_id_to_frequency_dict.get(qid, 0))
-    test_file_content["data_2_frequency_in_test"] = test_file_content["qid2"].map(lambda qid: test_id_to_frequency_dict.get(qid, 0))
-    test_file_content["data_1_frequency_in_train_and_test"] = test_file_content["qid1"].map(lambda qid: train_and_test_id_to_frequency_dict.get(qid, 0))
-    test_file_content["data_2_frequency_in_train_and_test"] = test_file_content["qid2"].map(lambda qid: train_and_test_id_to_frequency_dict.get(qid, 0))
-
-    print("Retrieving frequencies as numpy array ...")
-    train_data_1_frequency_array = train_file_content[["data_1_frequency_in_test", "data_1_frequency_in_train_and_test"]].as_matrix().astype(np.float32)
-    train_data_2_frequency_array = train_file_content[["data_2_frequency_in_test", "data_2_frequency_in_train_and_test"]].as_matrix().astype(np.float32)
-    test_data_1_frequency_array = test_file_content[["data_1_frequency_in_test", "data_1_frequency_in_train_and_test"]].as_matrix().astype(np.float32)
-    test_data_2_frequency_array = test_file_content[["data_2_frequency_in_test", "data_2_frequency_in_train_and_test"]].as_matrix().astype(np.float32)
-
-    return train_data_1_frequency_array, train_data_2_frequency_array, test_data_1_frequency_array, test_data_2_frequency_array
-
 def load_dataset():
     if os.path.isfile(DATASET_FILE_PATH):
         print("Loading dataset from disk ...")
         dataset_file_content = np.load(DATASET_FILE_PATH)
         train_data_1_array = dataset_file_content["train_data_1_array"]
-        train_data_1_frequency_array = dataset_file_content["train_data_1_frequency_array"]
         train_data_2_array = dataset_file_content["train_data_2_array"]
-        train_data_2_frequency_array = dataset_file_content["train_data_2_frequency_array"]
         test_data_1_array = dataset_file_content["test_data_1_array"]
-        test_data_1_frequency_array = dataset_file_content["test_data_1_frequency_array"]
         test_data_2_array = dataset_file_content["test_data_2_array"]
-        test_data_2_frequency_array = dataset_file_content["test_data_2_frequency_array"]
         train_label_array = dataset_file_content["train_label_array"]
         embedding_matrix = dataset_file_content["embedding_matrix"]
 
-        return train_data_1_array, train_data_1_frequency_array, train_data_2_array, train_data_2_frequency_array, \
-            test_data_1_array, test_data_1_frequency_array, test_data_2_array, test_data_2_frequency_array, train_label_array, embedding_matrix
+        return train_data_1_array, train_data_2_array, test_data_1_array, test_data_2_array, \
+            train_label_array, embedding_matrix
     else:
         print("Initiating word2vec ...")
         word2vec = KeyedVectors.load_word2vec_format(EMBEDDING_FILE_PATH, binary=True)
@@ -230,10 +180,6 @@ def load_dataset():
         known_typo_dict = {}
         train_text_1_list, train_text_2_list, train_label_list = load_file(TRAIN_FILE_PATH, word_to_index_dict, known_typo_dict)
         test_text_1_list, test_text_2_list = load_file(TEST_FILE_PATH, word_to_index_dict, known_typo_dict)
-        train_label_array = np.array(train_label_list, dtype=np.bool)
-
-        print("Getting frequency array ...")
-        train_data_1_frequency_array, train_data_2_frequency_array, test_data_1_frequency_array, test_data_2_frequency_array = get_frequency_array()
 
         print("Initiating tokenizer ...")
         tokenizer = Tokenizer()
@@ -259,18 +205,19 @@ def load_dataset():
             embedding_matrix[index] = word2vec.word_vec(word)
         assert np.sum(np.isclose(np.sum(embedding_matrix, axis=1), 0)) == 1
 
+        print("Converting to numpy array ...")
+        train_label_array = np.array(train_label_list, dtype=np.bool)
+
         print("Saving dataset to disk ...")
         np.savez_compressed(DATASET_FILE_PATH,
-                            train_data_1_array=train_data_1_array, train_data_1_frequency_array=train_data_1_frequency_array,
-                            train_data_2_array=train_data_2_array, train_data_2_frequency_array=train_data_2_frequency_array,
-                            test_data_1_array=test_data_1_array, test_data_1_frequency_array=test_data_1_frequency_array,
-                            test_data_2_array=test_data_2_array, test_data_2_frequency_array=test_data_2_frequency_array,
+                            train_data_1_array=train_data_1_array, train_data_2_array=train_data_2_array,
+                            test_data_1_array=test_data_1_array, test_data_2_array=test_data_2_array,
                             train_label_array=train_label_array, embedding_matrix=embedding_matrix)
 
-        return train_data_1_array, train_data_1_frequency_array, train_data_2_array, train_data_2_frequency_array, \
-            test_data_1_array, test_data_1_frequency_array, test_data_2_array, test_data_2_frequency_array, train_label_array, embedding_matrix
+        return train_data_1_array, train_data_2_array, test_data_1_array, test_data_2_array, \
+            train_label_array, embedding_matrix
 
-def init_model(embedding_matrix, frequency_dim, learning_rate=0.002):
+def init_model(embedding_matrix, learning_rate=0.002):
     def get_sentence_feature_extractor(embedding_matrix):
         input_tensor = Input(shape=(None,), dtype="int32")
         output_tensor = Embedding(input_dim=embedding_matrix.shape[0], output_dim=embedding_matrix.shape[1],
@@ -297,15 +244,11 @@ def init_model(embedding_matrix, frequency_dim, learning_rate=0.002):
     # Initiate the input tensors
     input_data_1_tensor = Input(shape=(None,), dtype="int32")
     input_data_2_tensor = Input(shape=(None,), dtype="int32")
-    input_data_1_frequency_tensor = Input(shape=(frequency_dim,))
-    input_data_2_frequency_tensor = Input(shape=(frequency_dim,))
 
     # Define the sentence feature extractor
     sentence_feature_extractor = get_sentence_feature_extractor(embedding_matrix)
     input_1_feature_tensor = sentence_feature_extractor(input_data_1_tensor)
-    input_1_feature_tensor = merge([input_1_feature_tensor, input_data_1_frequency_tensor], mode="concat")
     input_2_feature_tensor = sentence_feature_extractor(input_data_2_tensor)
-    input_2_feature_tensor = merge([input_2_feature_tensor, input_data_2_frequency_tensor], mode="concat")
     merged_feature_1_tensor = merge([input_1_feature_tensor, input_2_feature_tensor], mode="concat")
     merged_feature_2_tensor = merge([input_2_feature_tensor, input_1_feature_tensor], mode="concat")
 
@@ -317,7 +260,7 @@ def init_model(embedding_matrix, frequency_dim, learning_rate=0.002):
     output_tensor = Lambda(lambda x: K.mean(x, axis=1, keepdims=True), output_shape=(1,))(output_tensor)
 
     # Define the overall model
-    model = Model([input_data_1_tensor, input_data_1_frequency_tensor, input_data_2_tensor, input_data_2_frequency_tensor], output_tensor)
+    model = Model([input_data_1_tensor, input_data_2_tensor], output_tensor)
     model.compile(optimizer=Nadam(lr=learning_rate), loss="binary_crossentropy", metrics=["accuracy"])
     model.summary()
 
@@ -334,12 +277,12 @@ def init_model(embedding_matrix, frequency_dim, learning_rate=0.002):
 
     return model
 
-def divide_dataset(data_1_array, data_1_frequency_array, data_2_array, data_2_frequency_array, label_array, validation_split=0.2):
+def divide_dataset(data_1_array, data_2_array, label_array, validation_split=0.2):
     print("Dividing dataset ...")
     cv_object = StratifiedShuffleSplit(n_splits=1, test_size=validation_split, random_state=0)
     for train_index_array, valid_index_array in cv_object.split(np.zeros((len(label_array), 1)), label_array):
-        return data_1_array[train_index_array], data_1_frequency_array[train_index_array], data_2_array[train_index_array], data_2_frequency_array[train_index_array], label_array[train_index_array], \
-            data_1_array[valid_index_array], data_1_frequency_array[valid_index_array], data_2_array[valid_index_array], data_2_frequency_array[valid_index_array], label_array[valid_index_array]
+        return data_1_array[train_index_array], data_2_array[train_index_array], label_array[train_index_array], \
+            data_1_array[valid_index_array], data_2_array[valid_index_array], label_array[valid_index_array]
 
 class InspectLossAccuracy(Callback):
     def __init__(self):
@@ -388,16 +331,15 @@ def run():
     os.makedirs(SUBMISSION_FOLDER_PATH, exist_ok=True)
 
     print("Loading dataset ...")
-    train_data_1_array, train_data_1_frequency_array, train_data_2_array, train_data_2_frequency_array, \
-        test_data_1_array, test_data_1_frequency_array, test_data_2_array, test_data_2_frequency_array, train_label_array, embedding_matrix = load_dataset()
+    train_data_1_array, train_data_2_array, test_data_1_array, test_data_2_array, train_label_array, embedding_matrix = load_dataset()
 
     print("Initializing model ...")
-    model = init_model(embedding_matrix, frequency_dim=train_data_1_frequency_array.shape[-1])
+    model = init_model(embedding_matrix)
 
     if PERFORM_TRAINING:
         print("Dividing the vanilla training dataset ...")
-        actual_train_data_1_array, actual_train_data_1_frequency_array, actual_train_data_2_array, actual_train_data_2_frequency_array, actual_train_label_array, \
-        actual_valid_data_1_array, actual_valid_data_1_frequency_array, actual_valid_data_2_array, actual_valid_data_2_frequency_array, actual_valid_label_array = divide_dataset(train_data_1_array, train_data_1_frequency_array, train_data_2_array, train_data_2_frequency_array, train_label_array)
+        actual_train_data_1_array, actual_train_data_2_array, actual_train_label_array, \
+        actual_valid_data_1_array, actual_valid_data_2_array, actual_valid_label_array = divide_dataset(train_data_1_array, train_data_2_array, train_label_array)
 
         print("Calculating class weight ...")
         train_mean_prediction = np.mean(actual_train_label_array)
@@ -411,8 +353,8 @@ def run():
         earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
         modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_RULE, monitor="val_loss", save_best_only=True, save_weights_only=True)
         inspectlossaccuracy_callback = InspectLossAccuracy()
-        model.fit([actual_train_data_1_array, actual_train_data_1_frequency_array, actual_train_data_2_array, actual_train_data_2_frequency_array], actual_train_label_array, batch_size=BATCH_SIZE,
-                validation_data=([actual_valid_data_1_array, actual_valid_data_1_frequency_array, actual_valid_data_2_array, actual_valid_data_2_frequency_array], actual_valid_label_array, valid_sample_weights),
+        model.fit([actual_train_data_1_array, actual_train_data_2_array], actual_train_label_array, batch_size=BATCH_SIZE,
+                validation_data=([actual_valid_data_1_array, actual_valid_data_2_array], actual_valid_label_array, valid_sample_weights),
                 callbacks=[earlystopping_callback, modelcheckpoint_callback, inspectlossaccuracy_callback],
                 class_weight=train_class_weight, nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
     else:
@@ -421,7 +363,7 @@ def run():
         print("Performing the testing procedure ...")
         submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "Aurora.csv")
         if not os.path.isfile(submission_file_path):
-            prediction_array = model.predict([test_data_1_array, test_data_1_frequency_array, test_data_2_array, test_data_2_frequency_array], batch_size=BATCH_SIZE, verbose=2)
+            prediction_array = model.predict([test_data_1_array, test_data_2_array], batch_size=BATCH_SIZE, verbose=2)
             submission_file_content = pd.DataFrame({"test_id":np.arange(len(prediction_array)), "is_duplicate":prediction_array.flat})
             submission_file_content.to_csv(submission_file_path, index=False)
 
