@@ -75,9 +75,7 @@ def correct_typo(word, word_to_index_dict, known_typo_dict, min_word_length=8):
     return selected_candidate_word
 
 def clean_sentence(original_sentence, word_to_index_dict, known_typo_dict, result_when_failure="empty"):
-    """
-        https://www.kaggle.com/currie32/quora-question-pairs/the-importance-of-cleaning-text
-    """
+    # https://www.kaggle.com/currie32/quora-question-pairs/the-importance-of-cleaning-text
     try:
         # Convert to lower case
         cleaned_sentence = " ".join(original_sentence.lower().split())
