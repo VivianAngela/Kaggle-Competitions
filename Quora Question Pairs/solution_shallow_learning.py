@@ -140,7 +140,8 @@ def get_handmade_feature(question1, question2, is_duplicate):
 
     return entry
 
-def get_magic_feature(file_content):
+def get_magic_feature_v1(file_content):
+    # https://www.kaggle.com/jturkewitz/magic-features-0-03-gain
     def get_id_to_frequency_dict(pandas_series_list):
         id_list = []
         for pandas_series in pandas_series_list:
@@ -186,7 +187,7 @@ def load_dataset():
         merged_file_content = pd.DataFrame(Parallel(n_jobs=-2)(delayed(get_handmade_feature)(question1, question2, is_duplicate) for question1, question2, is_duplicate in merged_file_content[["question1", "question2", "is_duplicate"]].as_matrix()))
 
         print("Getting magic features ...")
-        merged_file_content = get_magic_feature(merged_file_content)
+        merged_file_content = get_magic_feature_v1(merged_file_content)
 
         print("Removing irrelevant columns ...")
         merged_file_content.drop(["qid1", "qid2", "question1", "question2"], axis=1, inplace=True)
