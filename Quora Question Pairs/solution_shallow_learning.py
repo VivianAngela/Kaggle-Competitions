@@ -281,15 +281,15 @@ def run():
             valid_class_weight = {0: (1 - TARGET_MEAN_PREDICTION) / (1 - valid_mean_prediction), 1: TARGET_MEAN_PREDICTION / valid_mean_prediction}
 
             print("Performing data augmentation ...")
-            train_feature_array, train_label_array = get_augmented_data(actual_train_question1_feature_array, actual_train_question2_feature_array, actual_train_common_feature_array, actual_train_label_array)
-            train_weight_list = [train_class_weight[label] for label in train_label_array]
-            train_data = lgb.Dataset(train_feature_array, label=train_label_array, weight=train_weight_list)
-            valid_feature_array, valid_label_array = get_augmented_data(actual_valid_question1_feature_array, actual_valid_question2_feature_array, actual_valid_common_feature_array, actual_valid_label_array)
-            valid_weight_list = [valid_class_weight[label] for label in valid_label_array]
-            valid_data = lgb.Dataset(valid_feature_array, label=valid_label_array, weight=valid_weight_list, reference=train_data)
+            actual_train_feature_array, actual_train_label_array = get_augmented_data(actual_train_question1_feature_array, actual_train_question2_feature_array, actual_train_common_feature_array, actual_train_label_array)
+            actual_train_weight_list = [train_class_weight[label] for label in actual_train_label_array]
+            actual_train_data = lgb.Dataset(actual_train_feature_array, label=actual_train_label_array, weight=actual_train_weight_list)
+            actual_valid_feature_array, actual_valid_label_array = get_augmented_data(actual_valid_question1_feature_array, actual_valid_question2_feature_array, actual_valid_common_feature_array, actual_valid_label_array)
+            actual_valid_weight_list = [valid_class_weight[label] for label in actual_valid_label_array]
+            actual_valid_data = lgb.Dataset(actual_valid_feature_array, label=actual_valid_label_array, weight=actual_valid_weight_list, reference=actual_train_data)
 
             print("Performing the training procedure ...")
-            model = lgb.train(params=best_params, train_set=train_data, valid_sets=[valid_data], num_boost_round=NUM_BOOST_ROUND, early_stopping_rounds=EARLY_STOPPING_ROUNDS)
+            model = lgb.train(params=best_params, train_set=actual_train_data, valid_sets=[actual_valid_data], num_boost_round=NUM_BOOST_ROUND, early_stopping_rounds=EARLY_STOPPING_ROUNDS)
             model.save_model(optimal_weights_file_path, num_iteration=model.best_iteration)
 
         assert os.path.isfile(optimal_weights_file_path)
