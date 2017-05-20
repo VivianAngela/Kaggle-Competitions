@@ -173,11 +173,27 @@ def load_dataset():
         print("Saving dataset to disk ...")
         merged_file_content.to_csv(DATASET_FILE_PATH, index=False)
 
-    return merged_file_content
+    print("Separating feature columns ...")
+    column_name_list = list(merged_file_content)
+    question1_feature_column_name_list = sorted([column_name for column_name in column_name_list if column_name.startswith("question1_")])
+    question2_feature_column_name_list = sorted([column_name for column_name in column_name_list if column_name.startswith("question2_")])
+    common_feature_column_name_list = sorted(set(column_name_list) - set(question1_feature_column_name_list + question2_feature_column_name_list + ["is_duplicate"]))
+    is_train_mask_array = merged_file_content["is_duplicate"] != -1
+    train_question1_feature_array = merged_file_content[is_train_mask_array][question1_feature_column_name_list].as_matrix().astype(np.float32)
+    train_question2_feature_array = merged_file_content[is_train_mask_array][question2_feature_column_name_list].as_matrix().astype(np.float32)
+    train_common_feature_array = merged_file_content[is_train_mask_array][common_feature_column_name_list].as_matrix().astype(np.float32)
+    train_label_array = merged_file_content[is_train_mask_array]["is_duplicate"].as_matrix().astype(np.bool)
+    test_question1_feature_array = merged_file_content[np.logical_not(is_train_mask_array)][question1_feature_column_name_list].as_matrix().astype(np.float32)
+    test_question2_feature_array = merged_file_content[np.logical_not(is_train_mask_array)][question2_feature_column_name_list].as_matrix().astype(np.float32)
+    test_common_feature_array = merged_file_content[np.logical_not(is_train_mask_array)][common_feature_column_name_list].as_matrix().astype(np.float32)
+
+    return train_question1_feature_array, train_question2_feature_array, train_common_feature_array, train_label_array, \
+        test_question1_feature_array, test_question2_feature_array, test_common_feature_array
 
 def run():
     print("Loading dataset ...")
-    merged_file_content = load_dataset()
+    train_question1_feature_array, train_question2_feature_array, train_common_feature_array, train_label_array, \
+        test_question1_feature_array, test_question2_feature_array, test_common_feature_array = load_dataset()
 
     print("All done!")
 
