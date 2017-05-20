@@ -365,7 +365,7 @@ def run():
             valid_sample_weights[np.logical_not(actual_valid_label_array)] = valid_class_weight[0]
             earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
             modelcheckpoint_callback = ModelCheckpoint(optimal_weights_file_path, monitor="val_loss", save_best_only=True, save_weights_only=True)
-            inspectlossaccuracy_callback = InspectLossAccuracy(split_index)
+            inspectlossaccuracy_callback = InspectLossAccuracy(split_index=split_index)
             model.fit([actual_train_data_1_array, actual_train_data_2_array], actual_train_label_array, batch_size=BATCH_SIZE,
                     validation_data=([actual_valid_data_1_array, actual_valid_data_2_array], actual_valid_label_array, valid_sample_weights),
                     callbacks=[earlystopping_callback, modelcheckpoint_callback, inspectlossaccuracy_callback],
