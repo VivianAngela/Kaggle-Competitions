@@ -5,7 +5,7 @@ import glob
 import numpy as np
 import pandas as pd
 import lightgbm as lgb
-from collections import Counter
+from collections import Counter, defaultdict
 from joblib import Parallel, delayed
 from nltk.corpus import stopwords
 from sklearn.model_selection import StratifiedKFold
@@ -44,6 +44,19 @@ def get_word_to_weight_dict(question_list):
     word_to_weight_dict = {word: get_weight(count) for word, count in counter_object.items()}
     return word_to_weight_dict
 
+def get_question_to_paired_questions_dict(question1_list, question2_list):
+    question_to_paired_questions_dict = defaultdict(set)
+    for question1, question2 in zip(question1_list, question2_list):
+        # Convert to string
+        question1 = str(question1)
+        question2 = str(question2)
+
+        # Add entries
+        question_to_paired_questions_dict[question1].add(question2)
+        question_to_paired_questions_dict[question2].add(question1)
+
+    return question_to_paired_questions_dict
+
 print("Loading text files ...")
 TRAIN_FILE_CONTENT = pd.read_csv(TRAIN_FILE_PATH, encoding="utf-8")
 TEST_FILE_CONTENT = pd.read_csv(TEST_FILE_PATH, encoding="utf-8")
@@ -51,6 +64,8 @@ TEST_FILE_CONTENT = pd.read_csv(TEST_FILE_PATH, encoding="utf-8")
 print("Getting handmade features ...")
 STOPWORD_SET = set(stopwords.words("english"))
 WORD_TO_WEIGHT_DICT = get_word_to_weight_dict(TRAIN_FILE_CONTENT["question1"].tolist() + TRAIN_FILE_CONTENT["question2"].tolist())
+QUESTION_TO_PAIRED_QUESTIONS_DICT = get_question_to_paired_questions_dict(TRAIN_FILE_CONTENT["question1"].tolist() + TEST_FILE_CONTENT["question1"].tolist(), \
+                                                                        TRAIN_FILE_CONTENT["question2"].tolist() + TEST_FILE_CONTENT["question2"].tolist())
 
 def get_handmade_feature(question1, question2, is_duplicate):
     # Convert to string
@@ -137,6 +152,19 @@ def get_handmade_feature(question1, question2, is_duplicate):
         entry["non_stopword_num_ratio"] = len(common_non_stopword_set) / non_stopword_num_ratio_denominator
     if cosine_denominator != 0:
         entry["cosine"] = np.dot(common_non_stopword_weight_list, common_non_stopword_weight_list) / cosine_denominator
+
+    # Compare the paired questions
+    # https://www.kaggle.com/tour1st/magic-feature-v2-0-045-gain
+    question1_paired_questions = QUESTION_TO_PAIRED_QUESTIONS_DICT[question1]
+    question2_paired_questions = QUESTION_TO_PAIRED_QUESTIONS_DICT[question2]
+    common_paired_questions = question1_paired_questions.intersection(question2_paired_questions)
+    entry["question1_paired_questions_num"] = len(question1_paired_questions)
+    entry["question2_paired_questions_num"] = len(question2_paired_questions)
+    entry["common_paired_questions_num"] = len(common_paired_questions)
+    entry["question_paired_questions_num_diff"] = abs(entry["question1_paired_questions_num"] - entry["question2_paired_questions_num"])
+    entry["question1_common_paired_questions_ratio"] = entry["common_paired_questions_num"] / entry["question1_paired_questions_num"]
+    entry["question2_common_paired_questions_ratio"] = entry["common_paired_questions_num"] / entry["question2_paired_questions_num"]
+    entry["question_common_paired_questions_ratio_diff"] = abs(entry["question1_common_paired_questions_ratio"] - entry["question2_common_paired_questions_ratio"])
 
     return entry
 
