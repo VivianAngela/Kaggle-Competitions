@@ -164,7 +164,7 @@ def get_magic_feature_v1(file_content):
     id_to_frequency_dict = get_id_to_frequency_dict([file_content["qid1"], file_content["qid2"]])
     file_content["question1_frequency"] = file_content["qid1"].map(lambda qid: id_to_frequency_dict.get(qid, 0))
     file_content["question2_frequency"] = file_content["qid2"].map(lambda qid: id_to_frequency_dict.get(qid, 0))
-    file_content["question_frequency_diff"] = file_content["question1_frequency"] - file_content["question2_frequency"]
+    file_content["question_frequency_diff"] = abs(file_content["question1_frequency"] - file_content["question2_frequency"])
 
     return file_content
 
