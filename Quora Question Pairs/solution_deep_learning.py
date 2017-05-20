@@ -28,7 +28,7 @@ PROJECT_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset",
 TRAIN_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "train.csv")
 TEST_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "test.csv")
 EMBEDDING_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "GoogleNews-vectors-negative300.bin")
-DATASET_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "dataset.npz")
+DATASET_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "deep_learning_dataset.npz")
 MAX_SEQUENCE_LENGTH = 30
 
 # Output
@@ -165,9 +165,6 @@ def load_dataset():
         test_data_2_array = dataset_file_content["test_data_2_array"]
         train_label_array = dataset_file_content["train_label_array"]
         embedding_matrix = dataset_file_content["embedding_matrix"]
-
-        return train_data_1_array, train_data_2_array, test_data_1_array, test_data_2_array, \
-            train_label_array, embedding_matrix
     else:
         print("Initiating word2vec ...")
         word2vec = KeyedVectors.load_word2vec_format(EMBEDDING_FILE_PATH, binary=True)
@@ -212,8 +209,8 @@ def load_dataset():
                             test_data_1_array=test_data_1_array, test_data_2_array=test_data_2_array,
                             train_label_array=train_label_array, embedding_matrix=embedding_matrix)
 
-        return train_data_1_array, train_data_2_array, test_data_1_array, test_data_2_array, \
-            train_label_array, embedding_matrix
+    return train_data_1_array, train_data_2_array, test_data_1_array, test_data_2_array, \
+        train_label_array, embedding_matrix
 
 def init_model(embedding_matrix, learning_rate=0.002):
     def get_sentence_feature_extractor(embedding_matrix):

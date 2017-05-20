@@ -12,7 +12,7 @@ PROJECT_NAME = "Quora Question Pairs"
 PROJECT_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset", PROJECT_NAME)
 TRAIN_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "train.csv")
 TEST_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "test.csv")
-DATASET_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "dataset.csv")
+DATASET_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "shallow_learning_dataset.npz")
 
 def get_word_to_weight_dict(question_list):
     def get_weight(count, eps=10000, min_count=2):
@@ -155,7 +155,14 @@ def get_magic_feature(file_content):
 def load_dataset():
     if os.path.isfile(DATASET_FILE_PATH):
         print("Loading dataset from disk ...")
-        merged_file_content = pd.read_csv(DATASET_FILE_PATH, encoding="utf-8")
+        dataset_file_content = np.load(DATASET_FILE_PATH)
+        train_question1_feature_array = dataset_file_content["train_question1_feature_array"]
+        train_question2_feature_array = dataset_file_content["train_question2_feature_array"]
+        train_common_feature_array = dataset_file_content["train_common_feature_array"]
+        train_label_array = dataset_file_content["train_label_array"]
+        test_question1_feature_array = dataset_file_content["test_question1_feature_array"]
+        test_question2_feature_array = dataset_file_content["test_question2_feature_array"]
+        test_common_feature_array = dataset_file_content["test_common_feature_array"]
     else:
         print("Merging train and test file content ...")
         merged_file_content = pd.concat([TRAIN_FILE_CONTENT, TEST_FILE_CONTENT])
@@ -170,22 +177,26 @@ def load_dataset():
         merged_file_content.drop(["qid1", "qid2", "question1", "question2"], axis=1, inplace=True)
         merged_file_content.fillna(-1, axis=1, inplace=True)
 
-        print("Saving dataset to disk ...")
-        merged_file_content.to_csv(DATASET_FILE_PATH, index=False)
+        print("Separating feature columns ...")
+        column_name_list = list(merged_file_content)
+        question1_feature_column_name_list = sorted([column_name for column_name in column_name_list if column_name.startswith("question1_")])
+        question2_feature_column_name_list = sorted([column_name for column_name in column_name_list if column_name.startswith("question2_")])
+        common_feature_column_name_list = sorted(set(column_name_list) - set(question1_feature_column_name_list + question2_feature_column_name_list + ["is_duplicate"]))
+        is_train_mask_array = merged_file_content["is_duplicate"] != -1
+        train_question1_feature_array = merged_file_content[is_train_mask_array][question1_feature_column_name_list].as_matrix().astype(np.float32)
+        train_question2_feature_array = merged_file_content[is_train_mask_array][question2_feature_column_name_list].as_matrix().astype(np.float32)
+        train_common_feature_array = merged_file_content[is_train_mask_array][common_feature_column_name_list].as_matrix().astype(np.float32)
+        train_label_array = merged_file_content[is_train_mask_array]["is_duplicate"].as_matrix().astype(np.bool)
+        test_question1_feature_array = merged_file_content[np.logical_not(is_train_mask_array)][question1_feature_column_name_list].as_matrix().astype(np.float32)
+        test_question2_feature_array = merged_file_content[np.logical_not(is_train_mask_array)][question2_feature_column_name_list].as_matrix().astype(np.float32)
+        test_common_feature_array = merged_file_content[np.logical_not(is_train_mask_array)][common_feature_column_name_list].as_matrix().astype(np.float32)
 
-    print("Separating feature columns ...")
-    column_name_list = list(merged_file_content)
-    question1_feature_column_name_list = sorted([column_name for column_name in column_name_list if column_name.startswith("question1_")])
-    question2_feature_column_name_list = sorted([column_name for column_name in column_name_list if column_name.startswith("question2_")])
-    common_feature_column_name_list = sorted(set(column_name_list) - set(question1_feature_column_name_list + question2_feature_column_name_list + ["is_duplicate"]))
-    is_train_mask_array = merged_file_content["is_duplicate"] != -1
-    train_question1_feature_array = merged_file_content[is_train_mask_array][question1_feature_column_name_list].as_matrix().astype(np.float32)
-    train_question2_feature_array = merged_file_content[is_train_mask_array][question2_feature_column_name_list].as_matrix().astype(np.float32)
-    train_common_feature_array = merged_file_content[is_train_mask_array][common_feature_column_name_list].as_matrix().astype(np.float32)
-    train_label_array = merged_file_content[is_train_mask_array]["is_duplicate"].as_matrix().astype(np.bool)
-    test_question1_feature_array = merged_file_content[np.logical_not(is_train_mask_array)][question1_feature_column_name_list].as_matrix().astype(np.float32)
-    test_question2_feature_array = merged_file_content[np.logical_not(is_train_mask_array)][question2_feature_column_name_list].as_matrix().astype(np.float32)
-    test_common_feature_array = merged_file_content[np.logical_not(is_train_mask_array)][common_feature_column_name_list].as_matrix().astype(np.float32)
+        print("Saving dataset to disk ...")
+        np.savez_compressed(DATASET_FILE_PATH,
+                            train_question1_feature_array=train_question1_feature_array, train_question2_feature_array=train_question2_feature_array,
+                            train_common_feature_array=train_common_feature_array, train_label_array=train_label_array,
+                            test_question1_feature_array=test_question1_feature_array, test_question2_feature_array=test_question2_feature_array,
+                            test_common_feature_array=test_common_feature_array)
 
     return train_question1_feature_array, train_question2_feature_array, train_common_feature_array, train_label_array, \
         test_question1_feature_array, test_question2_feature_array, test_common_feature_array
