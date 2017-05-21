@@ -339,7 +339,7 @@ def run():
         print("Performing the testing procedure ...")
         prediction_array = model.predict(test_feature_array)
         prediction_array = np.mean(np.reshape(prediction_array, (-1, 2), order="F"), axis=1)
-        submission_file_content = pd.DataFrame({"test_id":np.arange(len(prediction_array)), "is_duplicate":np.squeeze(prediction_array)})
+        submission_file_content = pd.DataFrame({"test_id": np.arange(len(prediction_array)), "is_duplicate": np.squeeze(prediction_array)})
         submission_file_content.to_csv(submission_file_path, index=False)
 
     print("Performing ensembling ...")
