@@ -69,7 +69,10 @@ def init_model(image_height, image_width, unique_label_num, init_func=INIT_FUNC,
         return model
 
     # Initiate the input tensor
-    input_tensor = Input(shape=(3, image_height, image_width))
+    if K.image_dim_ordering() == "tf":
+        input_tensor = Input(shape=(image_height, image_width, 3))
+    else:
+        input_tensor = Input(shape=(3, image_height, image_width))
 
     # Define the feature extractor
     feature_extractor = get_feature_extractor(input_shape=K.int_shape(input_tensor)[1:])
