@@ -10,7 +10,6 @@ import pylab
 import numpy as np
 import pandas as pd
 from keras import backend as K
-from keras.applications.resnet50 import conv_block, identity_block, preprocess_input, ResNet50, TH_WEIGHTS_PATH_NO_TOP
 from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
 from keras.layers import Dense, Input, GlobalAveragePooling2D
 from keras.models import Model
@@ -18,6 +17,22 @@ from keras.optimizers import Adam
 from keras.preprocessing.image import ImageDataGenerator
 from keras.utils.visualize_util import plot
 from sklearn.model_selection import GroupShuffleSplit
+from data_preprocessing import PROCESSED_DATASET_FOLDER_PATH as DATASET_FOLDER_PATH
+from data_preprocessing import PROCESSED_IMAGE_HEIGHT as IMAGE_HEIGHT
+from data_preprocessing import PROCESSED_IMAGE_WIDTH as IMAGE_WIDTH
+
+# Choose ResNet50 or InceptionV3
+MODEL_NAME = "ResNet50"  # "ResNet50" or "InceptionV3"
+if MODEL_NAME == "ResNet50":
+    from keras.applications.resnet50 import preprocess_input as PREPROCESS_INPUT
+    from keras.applications.resnet50 import ResNet50 as INIT_FUNC
+    BOTTLENECK_LAYER_NAME = "activation_40"
+elif MODEL_NAME == "InceptionV3":
+    from keras.applications.inception_v3 import preprocess_input as PREPROCESS_INPUT
+    from keras.applications.inception_v3 import InceptionV3 as INIT_FUNC
+    BOTTLENECK_LAYER_NAME = "mixed8"
+else:
+    assert False
 
 # Dataset
 # TODO: Modify variables related to paths
@@ -32,15 +47,11 @@ ACTUAL_TRAIN_FOLDER_PATH = os.path.join(ACTUAL_DATASET_FOLDER_PATH, "train")
 ACTUAL_VALID_FOLDER_PATH = os.path.join(ACTUAL_DATASET_FOLDER_PATH, "valid")
 
 # Output
-OUTPUT_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "{}_output".format(os.path.basename(__file__).split(".")[0]))
+OUTPUT_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "{}_{}_output".format(os.path.basename(__file__).split(".")[0], MODEL_NAME))
 OPTIMAL_WEIGHTS_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "Optimal Weights")
 OPTIMAL_WEIGHTS_FILE_RULE = os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "epoch_{epoch:03d}-loss_{loss:.5f}-val_loss_{val_loss:.5f}.h5")
 SUBMISSION_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "submission")
 TRIAL_NUM = 10
-
-# Image processing
-IMAGE_HEIGHT = 256
-IMAGE_WIDTH = 256
 
 # Training and Testing procedure
 PERFORM_TRAINING = True
@@ -88,41 +99,38 @@ def reorganize_dataset():
 
     return len(glob.glob(os.path.join(ACTUAL_TRAIN_FOLDER_PATH, "*/*"))), len(glob.glob(os.path.join(ACTUAL_VALID_FOLDER_PATH, "*/*")))
 
-def init_model(image_height=224, image_width=224, unique_label_num=1000, learning_rate=0.0001):
-    def set_model_trainable_properties(model, trainable):
+def init_model(image_height, image_width, unique_label_num, init_func=INIT_FUNC, bottleneck_layer_name=BOTTLENECK_LAYER_NAME, learning_rate=0.00001):
+    def set_model_trainable_properties(model, trainable, bottleneck_layer_name):
         for layer in model.layers:
             layer.trainable = trainable
-        model.trainable = trainable
+            if layer.name == bottleneck_layer_name:
+                break
 
     def get_feature_extractor(input_shape):
-        feature_extractor = ResNet50(include_top=False, weights="imagenet", input_shape=input_shape)
-        feature_extractor = Model(input=feature_extractor.input, output=feature_extractor.get_layer("activation_40").output)
-        set_model_trainable_properties(feature_extractor, False)
+        feature_extractor = init_func(include_top=False, weights="imagenet", input_shape=input_shape)
+        set_model_trainable_properties(model=feature_extractor, trainable=False, bottleneck_layer_name=bottleneck_layer_name)
         return feature_extractor
 
-    def get_trainable_classifier(input_shape, unique_label_num):
+    def get_dense_classifier(input_shape, unique_label_num):
         input_tensor = Input(shape=input_shape)
-
-        x = conv_block(input_tensor, 3, [512, 512, 2048], stage=5, block="a")
-        x = identity_block(x, 3, [512, 512, 2048], stage=5, block="b")
-        x = identity_block(x, 3, [512, 512, 2048], stage=5, block="c")
-
-        x = GlobalAveragePooling2D(name="global_avg_pool")(x)
-        x = Dense(unique_label_num, activation="softmax", name="fc{}".format(unique_label_num))(x)
-
-        model = Model(input_tensor, x)
+        output_tensor = GlobalAveragePooling2D()(input_tensor)
+        output_tensor = Dense(unique_label_num, activation="softmax")(output_tensor)
+        model = Model(input_tensor, output_tensor)
         return model
 
     # Initiate the input tensor
-    input_tensor = Input(shape=(3, image_height, image_width))
+    if K.image_dim_ordering() == "tf":
+        input_tensor = Input(shape=(image_height, image_width, 3))
+    else:
+        input_tensor = Input(shape=(3, image_height, image_width))
 
     # Define the feature extractor
     feature_extractor = get_feature_extractor(input_shape=K.int_shape(input_tensor)[1:])
     output_tensor = feature_extractor(input_tensor)
 
     # Define the trainable classifier
-    trainable_classifier = get_trainable_classifier(input_shape=feature_extractor.output_shape[1:], unique_label_num=unique_label_num)
-    output_tensor = trainable_classifier(output_tensor)
+    dense_classifier = get_dense_classifier(input_shape=feature_extractor.output_shape[1:], unique_label_num=unique_label_num)
+    output_tensor = dense_classifier(output_tensor)
 
     # Define the overall model
     model = Model(input_tensor, output_tensor)
@@ -131,11 +139,8 @@ def init_model(image_height=224, image_width=224, unique_label_num=1000, learnin
 
     # Plot the model structures
     plot(feature_extractor, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "feature_extractor.png"), show_shapes=True, show_layer_names=True)
-    plot(trainable_classifier, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "trainable_classifier.png"), show_shapes=True, show_layer_names=True)
+    plot(dense_classifier, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "dense_classifier.png"), show_shapes=True, show_layer_names=True)
     plot(model, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "model.png"), show_shapes=True, show_layer_names=True)
-
-    # Load weights for the trainable classifier
-    trainable_classifier.load_weights(os.path.expanduser(os.path.join("~", ".keras/models", TH_WEIGHTS_PATH_NO_TOP.split("/")[-1])), by_name=True)
 
     # Load weights if applicable
     if WEIGHTS_FILE_PATH is not None:
@@ -145,7 +150,7 @@ def init_model(image_height=224, image_width=224, unique_label_num=1000, learnin
 
     return model
 
-def load_dataset(folder_path, classes=None, class_mode=None, batch_size=BATCH_SIZE, shuffle=True, seed=None):
+def load_dataset(folder_path, target_size=(IMAGE_HEIGHT, IMAGE_WIDTH), classes=None, class_mode=None, batch_size=BATCH_SIZE, shuffle=True, seed=None, preprocess_input=PREPROCESS_INPUT):
     # Get the generator of the dataset
     data_generator_object = ImageDataGenerator(
         rotation_range=10,
@@ -158,7 +163,7 @@ def load_dataset(folder_path, classes=None, class_mode=None, batch_size=BATCH_SI
         preprocessing_function=lambda sample: preprocess_input(np.array([sample]))[0])
     data_generator = data_generator_object.flow_from_directory(
         directory=folder_path,
-        target_size=(IMAGE_HEIGHT, IMAGE_WIDTH),
+        target_size=target_size,
         color_mode="rgb",
         classes=classes,
         class_mode=class_mode,
