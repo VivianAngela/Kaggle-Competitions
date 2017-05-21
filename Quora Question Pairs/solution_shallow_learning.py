@@ -120,10 +120,10 @@ def get_handmade_feature(question1, question2, is_duplicate):
     question2_word_set = set(question2_word_list)
 
     # Calculate Jaccard index
-    common_word_set = question1_word_set.intersection(question2_word_set)
+    intersection_word_set = question1_word_set.intersection(question2_word_set)
     union_word_set = question1_word_set.union(question2_word_set)
     if len(union_word_set) != 0:
-        entry["jaccard_index"] = len(common_word_set) / len(union_word_set)
+        entry["jaccard_index"] = len(intersection_word_set) / len(union_word_set)
         entry["jaccard_index_log"] = np.log(entry["jaccard_index"] + 1)
 
     # Calculate the ratio of same words at the same positions
@@ -144,39 +144,39 @@ def get_handmade_feature(question1, question2, is_duplicate):
     question1_neighbour_word_set = set([word_tuple for word_tuple in zip(question1_word_list, question1_word_list[1:])])
     question2_neighbour_word_set = set([word_tuple for word_tuple in zip(question2_word_list, question2_word_list[1:])])
     if len(question1_neighbour_word_set) + len(question2_neighbour_word_set) != 0:
-        common_neighbour_word_set = question1_neighbour_word_set.intersection(question2_neighbour_word_set)
-        entry["neighbour_word_ratio"] = len(common_neighbour_word_set) / (len(question1_neighbour_word_set) + len(question2_neighbour_word_set))
+        intersection_neighbour_word_set = question1_neighbour_word_set.intersection(question2_neighbour_word_set)
+        entry["neighbour_word_ratio"] = len(intersection_neighbour_word_set) / (len(question1_neighbour_word_set) + len(question2_neighbour_word_set))
 
     # Calculate features of word count/weight
-    common_non_stopword_set = question1_non_stopword_set.intersection(question2_non_stopword_set)
-    common_non_stopword_weight_list = [WORD_TO_WEIGHT_DICT.get(word, 0) for word in common_non_stopword_set]
+    intersection_non_stopword_set = question1_non_stopword_set.intersection(question2_non_stopword_set)
+    intersection_non_stopword_weight_list = [WORD_TO_WEIGHT_DICT.get(word, 0) for word in intersection_non_stopword_set]
     question1_non_stopword_weight_list = [WORD_TO_WEIGHT_DICT.get(word, 0) for word in question1_non_stopword_set]
     question2_non_stopword_weight_list = [WORD_TO_WEIGHT_DICT.get(word, 0) for word in question2_non_stopword_set]
     total_non_stopword_weight_list = question1_non_stopword_weight_list + question2_non_stopword_weight_list
     non_stopword_weight_ratio_denominator = np.sum(total_non_stopword_weight_list)
-    non_stopword_num_ratio_denominator = len(question1_non_stopword_set) + len(question2_non_stopword_set) - len(common_non_stopword_set)
+    non_stopword_num_ratio_denominator = len(question1_non_stopword_set) + len(question2_non_stopword_set) - len(intersection_non_stopword_set)
     cosine_denominator = np.sqrt(np.dot(question1_non_stopword_weight_list, question1_non_stopword_weight_list)) * np.sqrt(np.dot(question2_non_stopword_weight_list, question2_non_stopword_weight_list))
-    entry["common_non_stopword_num"] = len(common_non_stopword_set)
+    entry["intersection_non_stopword_num"] = len(intersection_non_stopword_set)
     if non_stopword_weight_ratio_denominator != 0:
-        entry["non_stopword_weight_ratio"] = np.sum(common_non_stopword_weight_list) / non_stopword_weight_ratio_denominator
+        entry["non_stopword_weight_ratio"] = np.sum(intersection_non_stopword_weight_list) / non_stopword_weight_ratio_denominator
         entry["non_stopword_weight_ratio_sqrt"] = np.sqrt(entry["non_stopword_weight_ratio"])
     if non_stopword_num_ratio_denominator != 0:
-        entry["non_stopword_num_ratio"] = len(common_non_stopword_set) / non_stopword_num_ratio_denominator
+        entry["non_stopword_num_ratio"] = len(intersection_non_stopword_set) / non_stopword_num_ratio_denominator
     if cosine_denominator != 0:
-        entry["cosine"] = np.dot(common_non_stopword_weight_list, common_non_stopword_weight_list) / cosine_denominator
+        entry["cosine"] = np.dot(intersection_non_stopword_weight_list, intersection_non_stopword_weight_list) / cosine_denominator
 
     # Compare the paired questions
     # https://www.kaggle.com/tour1st/magic-feature-v2-0-045-gain
     question1_paired_questions = QUESTION_TO_PAIRED_QUESTIONS_DICT[question1]
     question2_paired_questions = QUESTION_TO_PAIRED_QUESTIONS_DICT[question2]
-    common_paired_questions = question1_paired_questions.intersection(question2_paired_questions)
+    intersection_paired_questions = question1_paired_questions.intersection(question2_paired_questions)
     entry["question1_paired_questions_num"] = len(question1_paired_questions)
     entry["question2_paired_questions_num"] = len(question2_paired_questions)
-    entry["common_paired_questions_num"] = len(common_paired_questions)
+    entry["intersection_paired_questions_num"] = len(intersection_paired_questions)
     entry["question_paired_questions_num_diff"] = abs(entry["question1_paired_questions_num"] - entry["question2_paired_questions_num"])
-    entry["question1_common_paired_questions_ratio"] = entry["common_paired_questions_num"] / entry["question1_paired_questions_num"]
-    entry["question2_common_paired_questions_ratio"] = entry["common_paired_questions_num"] / entry["question2_paired_questions_num"]
-    entry["question_common_paired_questions_ratio_diff"] = abs(entry["question1_common_paired_questions_ratio"] - entry["question2_common_paired_questions_ratio"])
+    entry["question1_intersection_paired_questions_ratio"] = entry["intersection_paired_questions_num"] / entry["question1_paired_questions_num"]
+    entry["question2_intersection_paired_questions_ratio"] = entry["intersection_paired_questions_num"] / entry["question2_paired_questions_num"]
+    entry["question_intersection_paired_questions_ratio_diff"] = abs(entry["question1_intersection_paired_questions_ratio"] - entry["question2_intersection_paired_questions_ratio"])
 
     return entry
 
