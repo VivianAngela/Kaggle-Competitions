@@ -61,7 +61,7 @@ print("Loading text files ...")
 TRAIN_FILE_CONTENT = pd.read_csv(TRAIN_FILE_PATH, encoding="utf-8")
 TEST_FILE_CONTENT = pd.read_csv(TEST_FILE_PATH, encoding="utf-8")
 
-print("Getting handmade features ...")
+print("Initiating global variables for handmade features ...")
 STOPWORD_SET = set(stopwords.words("english"))
 WORD_TO_WEIGHT_DICT = get_word_to_weight_dict(TRAIN_FILE_CONTENT["question1"].tolist() + TRAIN_FILE_CONTENT["question2"].tolist())
 QUESTION_TO_PAIRED_QUESTIONS_DICT = get_question_to_paired_questions_dict(TRAIN_FILE_CONTENT["question1"].tolist() + TEST_FILE_CONTENT["question1"].tolist(), \
@@ -85,6 +85,11 @@ def get_handmade_feature(question1, question2, is_duplicate):
     entry["question1_len"] = len(question1)
     entry["question2_len"] = len(question2)
     entry["question_len_diff"] = abs(entry["question1_len"] - entry["question2_len"])
+    entry["question_len_diff_log"] = np.log(entry["question_len_diff"] + 1)
+    lower_question_len, higher_question_len = sorted((entry["question1_len"], entry["question2_len"]))
+    if higher_question_len != 0:
+        entry["question_len_ratio"] = lower_question_len / higher_question_len
+        entry["question_len_ratio_log"] = np.log(entry["question_len_ratio"] + 1)
 
     # Calculate difference between lengths of questions without spaces
     entry["question1_char_num"] = len(question1.replace(" ", ""))
@@ -113,6 +118,13 @@ def get_handmade_feature(question1, question2, is_duplicate):
     question1_word_set = set(question1_word_list)
     question2_word_list = question2.lower().split()
     question2_word_set = set(question2_word_list)
+
+    # Calculate Jaccard index
+    common_word_set = question1_word_set.intersection(question2_word_set)
+    union_word_set = question1_word_set.union(question2_word_set)
+    if len(union_word_set) != 0:
+        entry["jaccard_index"] = len(common_word_set) / len(union_word_set)
+        entry["jaccard_index_log"] = np.log(entry["jaccard_index"] + 1)
 
     # Calculate the ratio of same words at the same positions
     if max(len(question1_word_list), len(question2_word_list)) != 0:
@@ -147,7 +159,7 @@ def get_handmade_feature(question1, question2, is_duplicate):
     entry["common_non_stopword_num"] = len(common_non_stopword_set)
     if non_stopword_weight_ratio_denominator != 0:
         entry["non_stopword_weight_ratio"] = np.sum(common_non_stopword_weight_list) / non_stopword_weight_ratio_denominator
-        entry["sqrt_non_stopword_weight_ratio"] = np.sqrt(entry["non_stopword_weight_ratio"])
+        entry["non_stopword_weight_ratio_sqrt"] = np.sqrt(entry["non_stopword_weight_ratio"])
     if non_stopword_num_ratio_denominator != 0:
         entry["non_stopword_num_ratio"] = len(common_non_stopword_set) / non_stopword_num_ratio_denominator
     if cosine_denominator != 0:
@@ -211,7 +223,7 @@ def load_dataset():
         print("Merging train and test file content ...")
         merged_file_content = pd.concat([TRAIN_FILE_CONTENT, TEST_FILE_CONTENT])
 
-        print("Getting handmade feature ...")
+        print("Getting handmade features ...")
         merged_file_content = pd.DataFrame(Parallel(n_jobs=-2)(delayed(get_handmade_feature)(question1, question2, is_duplicate) for question1, question2, is_duplicate in merged_file_content[["question1", "question2", "is_duplicate"]].as_matrix()))
 
         print("Getting magic features ...")
