@@ -13,6 +13,7 @@ from sklearn.model_selection import StratifiedKFold
 # Dataset
 PROJECT_NAME = "Quora Question Pairs"
 PROJECT_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset", PROJECT_NAME)
+EXTRA_FEATURES_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "Extra Features")
 TRAIN_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "train.csv")
 TEST_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "test.csv")
 DATASET_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "shallow_learning_dataset.npz")
@@ -208,6 +209,26 @@ def get_magic_feature(file_content):
 
     return file_content
 
+def load_extra_features():
+    print("Loading feature files ...")
+    train_file_content = pd.read_csv(os.path.join(EXTRA_FEATURES_FOLDER_PATH, "train_features.csv"), encoding="utf-8")
+    test_file_content = pd.read_csv(os.path.join(EXTRA_FEATURES_FOLDER_PATH, "test_features.csv"), encoding="utf-8")
+
+    print("Separating feature columns ...")
+    column_name_list = list(train_file_content)
+    question1_feature_column_name_list = sorted([column_name for column_name in column_name_list if "q1" in column_name])
+    question2_feature_column_name_list = sorted([column_name for column_name in column_name_list if "q2" in column_name])
+    common_feature_column_name_list = sorted(set(column_name_list) - set(question1_feature_column_name_list + question2_feature_column_name_list))
+    train_question1_feature_array = train_file_content[question1_feature_column_name_list].as_matrix().astype(np.float32)
+    train_question2_feature_array = train_file_content[question2_feature_column_name_list].as_matrix().astype(np.float32)
+    train_common_feature_array = train_file_content[common_feature_column_name_list].as_matrix().astype(np.float32)
+    test_question1_feature_array = test_file_content[question1_feature_column_name_list].as_matrix().astype(np.float32)
+    test_question2_feature_array = test_file_content[question2_feature_column_name_list].as_matrix().astype(np.float32)
+    test_common_feature_array = test_file_content[common_feature_column_name_list].as_matrix().astype(np.float32)
+
+    return train_question1_feature_array, train_question2_feature_array, train_common_feature_array, \
+        test_question1_feature_array, test_question2_feature_array, test_common_feature_array
+
 def load_dataset():
     if os.path.isfile(DATASET_FILE_PATH):
         print("Loading dataset from disk ...")
@@ -253,6 +274,18 @@ def load_dataset():
                             train_common_feature_array=train_common_feature_array, train_label_array=train_label_array,
                             test_question1_feature_array=test_question1_feature_array, test_question2_feature_array=test_question2_feature_array,
                             test_common_feature_array=test_common_feature_array)
+
+    print("Loading extra features ...")
+    extra_train_question1_feature_array, extra_train_question2_feature_array, extra_train_common_feature_array, \
+            extra_test_question1_feature_array, extra_test_question2_feature_array, extra_test_common_feature_array = load_extra_features()
+
+    print("Merging the features ...")
+    train_question1_feature_array = np.hstack((train_question1_feature_array, extra_train_question1_feature_array))
+    train_question2_feature_array = np.hstack((train_question2_feature_array, extra_train_question2_feature_array))
+    train_common_feature_array = np.hstack((train_common_feature_array, extra_train_common_feature_array))
+    test_question1_feature_array = np.hstack((test_question1_feature_array, extra_test_question1_feature_array))
+    test_question2_feature_array = np.hstack((test_question2_feature_array, extra_test_question2_feature_array))
+    test_common_feature_array = np.hstack((test_common_feature_array, extra_test_common_feature_array))
 
     return train_question1_feature_array, train_question2_feature_array, train_common_feature_array, train_label_array, \
         test_question1_feature_array, test_question2_feature_array, test_common_feature_array
