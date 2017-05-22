@@ -278,7 +278,7 @@ def run():
                 image_name_array = np.expand_dims([os.path.basename(image_path) for image_path in test_generator.filenames], axis=-1)
                 index_array_for_sorting = np.argsort(image_name_array, axis=0)
                 submission_file_content = pd.DataFrame(np.hstack((image_name_array, prediction_array))[index_array_for_sorting.flat])
-                submission_file_content.to_csv(submission_file_path, header=["image"] + unique_label_list, index=False)
+                submission_file_content.to_csv(submission_file_path, header=["image_name"] + unique_label_list, index=False)
 
         print("Performing ensembling ...")
         ensemble_predictions(SUBMISSION_FOLDER_PATH)
