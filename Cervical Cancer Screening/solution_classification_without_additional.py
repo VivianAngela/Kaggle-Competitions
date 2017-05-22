@@ -17,6 +17,7 @@ from keras.optimizers import Adam
 from keras.preprocessing.image import ImageDataGenerator
 from keras.utils.visualize_util import plot
 from sklearn.model_selection import GroupShuffleSplit
+from data_preprocessing import PROJECT_FOLDER_PATH
 from data_preprocessing import PROCESSED_DATASET_FOLDER_PATH as DATASET_FOLDER_PATH
 from data_preprocessing import PROCESSED_IMAGE_HEIGHT as IMAGE_HEIGHT
 from data_preprocessing import PROCESSED_IMAGE_WIDTH as IMAGE_WIDTH
@@ -35,10 +36,8 @@ else:
     assert False
 
 # Dataset
-# TODO: Modify variables related to paths
-DATASET_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset/The Nature Conservancy Fisheries Monitoring")
 TRAIN_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "train")
-TEST_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "test_stg1")
+TEST_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "test")
 
 # Workspace
 WORKSPACE_FOLDER_PATH = os.path.join("/tmp", os.path.basename(DATASET_FOLDER_PATH))
@@ -50,7 +49,7 @@ ACTUAL_VALID_FOLDER_PATH = os.path.join(ACTUAL_DATASET_FOLDER_PATH, "valid")
 OUTPUT_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "{}_{}_output".format(os.path.basename(__file__).split(".")[0], MODEL_NAME))
 OPTIMAL_WEIGHTS_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "Optimal Weights")
 OPTIMAL_WEIGHTS_FILE_RULE = os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "epoch_{epoch:03d}-loss_{loss:.5f}-val_loss_{val_loss:.5f}.h5")
-SUBMISSION_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "submission")
+SUBMISSION_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "submission")
 TRIAL_NUM = 10
 
 # Training and Testing procedure
@@ -219,10 +218,10 @@ def ensemble_predictions(submission_folder_path):
         ensemble_proba = ensemble_func(proba_array, axis=0)
         ensemble_proba = ensemble_proba / np.sum(ensemble_proba, axis=1)[:, np.newaxis]
         ensemble_submission_file_content.loc[:, proba_columns] = ensemble_proba
-        ensemble_submission_file_content.to_csv(os.path.join(submission_folder_path, ensemble_submission_file_name), index=False)
+        ensemble_submission_file_content.to_csv(os.path.abspath(os.path.join(submission_folder_path, os.pardir, ensemble_submission_file_name)), index=False)
 
     # Read predictions
-    submission_file_path_list = glob.glob(os.path.join(submission_folder_path, "Trial_*.csv"))
+    submission_file_path_list = glob.glob(os.path.join(submission_folder_path, "*_Trial_*.csv"))
     print("There are {} submissions in total.".format(len(submission_file_path_list)))
     submission_file_content_list = [pd.read_csv(submission_file_path) for submission_file_path in submission_file_path_list]
     ensemble_submission_file_content = submission_file_content_list[0]
@@ -271,7 +270,7 @@ def run():
         print("Performing the testing procedure ...")
         for trial_index in np.arange(TRIAL_NUM) + 1:
             print("Working on trial {}/{} ...".format(trial_index, TRIAL_NUM))
-            submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "Trial_{}.csv".format(trial_index))
+            submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "{}_Trial_{}.csv".format(MODEL_NAME, trial_index))
             if not os.path.isfile(submission_file_path):
                 print("Performing the testing procedure ...")
                 test_generator = load_dataset(TEST_FOLDER_PATH, shuffle=False, seed=trial_index)
