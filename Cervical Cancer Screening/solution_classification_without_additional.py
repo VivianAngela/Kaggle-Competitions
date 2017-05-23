@@ -127,7 +127,7 @@ def init_model(image_height, image_width, unique_label_num, init_func=INIT_FUNC,
     feature_extractor = get_feature_extractor(input_shape=K.int_shape(input_tensor)[1:])
     output_tensor = feature_extractor(input_tensor)
 
-    # Define the trainable classifier
+    # Define the dense classifier
     dense_classifier = get_dense_classifier(input_shape=feature_extractor.output_shape[1:], unique_label_num=unique_label_num)
     output_tensor = dense_classifier(output_tensor)
 
