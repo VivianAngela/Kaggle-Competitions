@@ -6,8 +6,11 @@ import numpy as np
 import pandas as pd
 import lightgbm as lgb
 from collections import Counter, defaultdict
+from difflib import SequenceMatcher
 from joblib import Parallel, delayed
+from nltk import pos_tag, word_tokenize
 from nltk.corpus import stopwords
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import StratifiedKFold
 
 # Dataset
@@ -67,6 +70,19 @@ STOPWORD_SET = set(stopwords.words("english"))
 WORD_TO_WEIGHT_DICT = get_word_to_weight_dict(TRAIN_FILE_CONTENT["question1"].tolist() + TRAIN_FILE_CONTENT["question2"].tolist())
 QUESTION_TO_PAIRED_QUESTIONS_DICT = get_question_to_paired_questions_dict(TRAIN_FILE_CONTENT["question1"].tolist() + TEST_FILE_CONTENT["question1"].tolist(), \
                                                                         TRAIN_FILE_CONTENT["question2"].tolist() + TEST_FILE_CONTENT["question2"].tolist())
+TFIDF_VECTORIZER = TfidfVectorizer(stop_words="english", ngram_range=(1, 1))
+TFIDF_VECTORIZER.fit(pd.Series(TRAIN_FILE_CONTENT["question1"].tolist() + TEST_FILE_CONTENT["question1"].tolist(), TRAIN_FILE_CONTENT["question2"].tolist() + TEST_FILE_CONTENT["question2"].tolist()).astype(str))
+
+get_noun_set = lambda question: set([word for word, tag in pos_tag(word_tokenize(question.lower())) if tag[:1] in ["N"]])
+
+def get_sequence_matcher_ratio(question1, question2):
+    sequence_matcher = SequenceMatcher()
+    sequence_matcher.set_seqs(str(question1).lower(), str(question2).lower())
+    return sequence_matcher.ratio()
+
+def get_document_term_array(question):
+    document_term_array = TFIDF_VECTORIZER.transform([question]).data
+    return document_term_array
 
 def get_handmade_feature(question1, question2, is_duplicate):
     # Convert to string
@@ -117,15 +133,28 @@ def get_handmade_feature(question1, question2, is_duplicate):
     # Get unique word list/set
     question1_word_list = question1.lower().split()
     question1_word_set = set(question1_word_list)
+    question1_noun_set = get_noun_set(question1)
     question2_word_list = question2.lower().split()
     question2_word_set = set(question2_word_list)
+    question2_noun_set = get_noun_set(question2)
 
-    # Calculate Jaccard index
+    # Calculate Jaccard index of words
     intersection_word_set = question1_word_set.intersection(question2_word_set)
     union_word_set = question1_word_set.union(question2_word_set)
+    entry["intersection_word_num"] = len(intersection_word_set)
+    entry["union_word_num"] = len(union_word_set)
     if len(union_word_set) != 0:
-        entry["jaccard_index"] = len(intersection_word_set) / len(union_word_set)
-        entry["jaccard_index_log"] = np.log(entry["jaccard_index"] + 1)
+        entry["word_jaccard_index"] = len(intersection_word_set) / len(union_word_set)
+        entry["word_jaccard_index_log"] = np.log(entry["word_jaccard_index"] + 1)
+
+    # Calculate Jaccard index of nouns
+    intersection_noun_set = question1_noun_set.intersection(question2_noun_set)
+    union_noun_set = question1_noun_set.union(question2_noun_set)
+    entry["intersection_noun_num"] = len(intersection_noun_set)
+    entry["union_noun_num"] = len(union_noun_set)
+    if len(union_noun_set) != 0:
+        entry["noun_jaccard_index"] = len(intersection_noun_set) / len(union_noun_set)
+        entry["noun_jaccard_index_log"] = np.log(entry["noun_jaccard_index"] + 1)
 
     # Calculate the ratio of same words at the same positions
     if max(len(question1_word_list), len(question2_word_list)) != 0:
@@ -136,9 +165,15 @@ def get_handmade_feature(question1, question2, is_duplicate):
     question2_stopword_set = question2_word_set.intersection(STOPWORD_SET)
     question1_non_stopword_set = question1_word_set.difference(STOPWORD_SET)
     question2_non_stopword_set = question2_word_set.difference(STOPWORD_SET)
-    if len(question1_stopword_set) + len(question1_non_stopword_set) != 0 and len(question2_stopword_set) + len(question2_non_stopword_set) != 0:
+    entry["question1_stopword_num"] = len(question1_stopword_set)
+    entry["question2_stopword_num"] = len(question2_stopword_set)
+    entry["question1_non_stopword_num"] = len(question1_non_stopword_set)
+    entry["question2_non_stopword_num"] = len(question2_non_stopword_set)
+    if len(question1_stopword_set) + len(question1_non_stopword_set) != 0:
         entry["question1_stopword_ratio"] = len(question1_stopword_set) / (len(question1_stopword_set) + len(question1_non_stopword_set))
+    if len(question2_stopword_set) + len(question2_non_stopword_set) != 0:
         entry["question2_stopword_ratio"] = len(question2_stopword_set) / (len(question2_stopword_set) + len(question2_non_stopword_set))
+    if "question1_stopword_ratio" in entry and "question2_stopword_ratio" in entry:
         entry["question_stopword_ratio_diff"] = abs(entry["question1_stopword_ratio"] - entry["question2_stopword_ratio"])
 
     # Calculate the neighbour word pairs
@@ -178,6 +213,24 @@ def get_handmade_feature(question1, question2, is_duplicate):
     entry["question1_intersection_paired_questions_ratio"] = entry["intersection_paired_questions_num"] / entry["question1_paired_questions_num"]
     entry["question2_intersection_paired_questions_ratio"] = entry["intersection_paired_questions_num"] / entry["question2_paired_questions_num"]
     entry["question_intersection_paired_questions_ratio_diff"] = abs(entry["question1_intersection_paired_questions_ratio"] - entry["question2_intersection_paired_questions_ratio"])
+
+    # Calculate sequences' similarity by using SequenceMatcher
+    entry["sequence_matcher_ratio"] = get_sequence_matcher_ratio(question1, question2)
+
+    # Calculate TF-IDF features
+    question1_document_term_array = get_document_term_array(question1)
+    question2_document_term_array = get_document_term_array(question2)
+    if len(question1_document_term_array) > 0:
+        entry["question1_TFIDF_sum"], entry["question1_TFIDF_mean"], entry["question1_TFIDF_std"], entry["question1_TFIDF_num"] = \
+            np.sum(question1_document_term_array), np.mean(question1_document_term_array), np.std(question1_document_term_array), len(question1_document_term_array)
+    if len(question2_document_term_array) > 0:
+        entry["question2_TFIDF_sum"], entry["question2_TFIDF_mean"], entry["question2_TFIDF_std"], entry["question2_TFIDF_num"] = \
+            np.sum(question2_document_term_array), np.mean(question2_document_term_array), np.std(question2_document_term_array), len(question2_document_term_array)
+    if "question1_TFIDF_sum" in entry and "question2_TFIDF_sum" in entry:
+        entry["question_TFIDF_sum_diff"] = abs(entry["question1_TFIDF_sum"] - entry["question2_TFIDF_sum"])
+        entry["question_TFIDF_mean_diff"] = abs(entry["question1_TFIDF_mean"] - entry["question2_TFIDF_mean"])
+        entry["question_TFIDF_std_diff"] = abs(entry["question1_TFIDF_std"] - entry["question2_TFIDF_std"])
+        entry["question_TFIDF_num_diff"] = abs(entry["question1_TFIDF_num"] - entry["question2_TFIDF_num"])
 
     return entry
 
