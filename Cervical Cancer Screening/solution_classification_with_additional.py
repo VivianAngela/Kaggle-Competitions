@@ -13,6 +13,7 @@ from keras.models import Model
 from keras.optimizers import Nadam
 from keras.preprocessing.image import ImageDataGenerator
 from keras.utils.visualize_util import plot
+from data_preprocessing import PROJECT_FOLDER_PATH
 from data_preprocessing import PROCESSED_DATASET_FOLDER_PATH as DATASET_FOLDER_PATH
 from data_preprocessing import PROCESSED_IMAGE_HEIGHT as IMAGE_HEIGHT
 from data_preprocessing import PROCESSED_IMAGE_WIDTH as IMAGE_WIDTH
@@ -48,14 +49,14 @@ ACTUAL_TRAIN_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "additional")
 ACTUAL_VALID_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "train")
 
 # Output
-OUTPUT_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "{}_{}_output".format(os.path.basename(__file__).split(".")[0], MODEL_NAME))
-OPTIMAL_WEIGHTS_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "Optimal Weights")
-OPTIMAL_WEIGHTS_FILE_RULE = os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "epoch_{epoch:03d}-loss_{loss:.5f}-val_loss_{val_loss:.5f}.h5")
+OUTPUT_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "phase_1")
+OPTIMAL_WEIGHTS_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "optimal weights")
+OPTIMAL_WEIGHTS_FILE_PATH = os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "{}.h5".format(MODEL_NAME))
 
 # Training procedure
 WEIGHTS_FILE_PATH = None
 MAXIMUM_EPOCH_NUM = 1000
-PATIENCE = 100
+PATIENCE = 4
 BATCH_SIZE = 32
 SEED = 0
 
@@ -99,9 +100,9 @@ def init_model(image_height, image_width, unique_label_num, init_func=INIT_FUNC,
     model.summary()
 
     # Plot the model structures
-    plot(feature_extractor, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "feature_extractor.png"), show_shapes=True, show_layer_names=True)
-    plot(dense_classifier, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "dense_classifier.png"), show_shapes=True, show_layer_names=True)
-    plot(model, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "model.png"), show_shapes=True, show_layer_names=True)
+    plot(feature_extractor, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "{}_feature_extractor.png".format(MODEL_NAME)), show_shapes=True, show_layer_names=True)
+    plot(dense_classifier, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "{}_dense_classifier.png".format(MODEL_NAME)), show_shapes=True, show_layer_names=True)
+    plot(model, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "{}_model.png".format(MODEL_NAME)), show_shapes=True, show_layer_names=True)
 
     # Load weights if applicable
     if WEIGHTS_FILE_PATH is not None:
@@ -191,7 +192,7 @@ def run():
     train_sample_num = len(train_generator.filenames)
     valid_sample_num = len(valid_generator.filenames)
     earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
-    modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_RULE, monitor="val_loss", save_best_only=True, save_weights_only=True)
+    modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_PATH, monitor="val_loss", save_best_only=True, save_weights_only=True)
     inspectlossaccuracy_callback = InspectLossAccuracy()
     model.fit_generator(generator=train_generator,
                         samples_per_epoch=train_sample_num,
