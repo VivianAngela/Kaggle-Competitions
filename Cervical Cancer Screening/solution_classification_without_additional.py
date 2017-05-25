@@ -21,6 +21,7 @@ from data_preprocessing import PROJECT_FOLDER_PATH
 from data_preprocessing import PROCESSED_DATASET_FOLDER_PATH as DATASET_FOLDER_PATH
 from data_preprocessing import PROCESSED_IMAGE_HEIGHT as IMAGE_HEIGHT
 from data_preprocessing import PROCESSED_IMAGE_WIDTH as IMAGE_WIDTH
+from solution_classification_with_additional import OUTPUT_FOLDER_PATH as PREVIOUS_OUTPUT_FOLDER_PATH
 
 # Choose ResNet50 or InceptionV3 or VGG16
 MODEL_NAME = "ResNet50"  # "ResNet50" or "InceptionV3" or "VGG16"
@@ -56,15 +57,14 @@ ACTUAL_TRAIN_FOLDER_PATH = os.path.join(ACTUAL_DATASET_FOLDER_PATH, "train")
 ACTUAL_VALID_FOLDER_PATH = os.path.join(ACTUAL_DATASET_FOLDER_PATH, "valid")
 
 # Output
-OUTPUT_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "{}_{}_output".format(os.path.basename(__file__).split(".")[0], MODEL_NAME))
-OPTIMAL_WEIGHTS_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "Optimal Weights")
+OUTPUT_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "phase_2")
+OPTIMAL_WEIGHTS_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "optimal weights")
 OPTIMAL_WEIGHTS_FILE_RULE = os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "epoch_{epoch:03d}-loss_{loss:.5f}-val_loss_{val_loss:.5f}.h5")
 SUBMISSION_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "submission")
 TRIAL_NUM = 10
 
 # Training and Testing procedure
 PERFORM_TRAINING = True
-WEIGHTS_FILE_PATH = None
 MAXIMUM_EPOCH_NUM = 1000
 PATIENCE = 100
 BATCH_SIZE = 32
@@ -148,15 +148,15 @@ def init_model(image_height, image_width, unique_label_num, init_func=INIT_FUNC,
     model.summary()
 
     # Plot the model structures
-    plot(feature_extractor, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "feature_extractor.png"), show_shapes=True, show_layer_names=True)
-    plot(dense_classifier, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "dense_classifier.png"), show_shapes=True, show_layer_names=True)
-    plot(model, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "model.png"), show_shapes=True, show_layer_names=True)
+    plot(feature_extractor, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "{}_feature_extractor.png".format(MODEL_NAME)), show_shapes=True, show_layer_names=True)
+    plot(dense_classifier, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "{}_dense_classifier.png".format(MODEL_NAME)), show_shapes=True, show_layer_names=True)
+    plot(model, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "{}_model.png".format(MODEL_NAME)), show_shapes=True, show_layer_names=True)
 
-    # Load weights if applicable
-    if WEIGHTS_FILE_PATH is not None:
-        assert os.path.isfile(WEIGHTS_FILE_PATH), "Could not find file {}!".format(WEIGHTS_FILE_PATH)
-        print("Loading weights from {} ...".format(WEIGHTS_FILE_PATH))
-        model.load_weights(WEIGHTS_FILE_PATH)
+    # Load weights from previous phase
+    previous_optimal_weights_file_path = os.path.join(PREVIOUS_OUTPUT_FOLDER_PATH, "{}.h5".format(MODEL_NAME))
+    assert os.path.isfile(previous_optimal_weights_file_path), "Could not find file {}!".format(previous_optimal_weights_file_path)
+    print("Loading weights from {} ...".format(previous_optimal_weights_file_path))
+    model.load_weights(previous_optimal_weights_file_path)
 
     return model
 
@@ -276,8 +276,6 @@ def run():
                             callbacks=[earlystopping_callback, modelcheckpoint_callback, inspectlossaccuracy_callback],
                             nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
     else:
-        assert WEIGHTS_FILE_PATH is not None
-
         print("Performing the testing procedure ...")
         for trial_index in np.arange(TRIAL_NUM) + 1:
             print("Working on trial {}/{} ...".format(trial_index, TRIAL_NUM))

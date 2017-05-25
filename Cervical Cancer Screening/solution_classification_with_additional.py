@@ -54,7 +54,6 @@ OPTIMAL_WEIGHTS_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "optimal weights"
 OPTIMAL_WEIGHTS_FILE_PATH = os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "{}.h5".format(MODEL_NAME))
 
 # Training procedure
-WEIGHTS_FILE_PATH = None
 MAXIMUM_EPOCH_NUM = 1000
 PATIENCE = 4
 BATCH_SIZE = 32
@@ -103,12 +102,6 @@ def init_model(image_height, image_width, unique_label_num, init_func=INIT_FUNC,
     plot(feature_extractor, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "{}_feature_extractor.png".format(MODEL_NAME)), show_shapes=True, show_layer_names=True)
     plot(dense_classifier, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "{}_dense_classifier.png".format(MODEL_NAME)), show_shapes=True, show_layer_names=True)
     plot(model, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "{}_model.png".format(MODEL_NAME)), show_shapes=True, show_layer_names=True)
-
-    # Load weights if applicable
-    if WEIGHTS_FILE_PATH is not None:
-        assert os.path.isfile(WEIGHTS_FILE_PATH), "Could not find file {}!".format(WEIGHTS_FILE_PATH)
-        print("Loading weights from {} ...".format(WEIGHTS_FILE_PATH))
-        model.load_weights(WEIGHTS_FILE_PATH)
 
     return model
 
