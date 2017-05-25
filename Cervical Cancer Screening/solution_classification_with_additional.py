@@ -8,9 +8,9 @@ import pylab
 import numpy as np
 from keras import backend as K
 from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
-from keras.layers import Dense, Input, GlobalAveragePooling2D
+from keras.layers import Dense, Dropout, Input, GlobalAveragePooling2D
 from keras.models import Model
-from keras.optimizers import Adam
+from keras.optimizers import Nadam
 from keras.preprocessing.image import ImageDataGenerator
 from keras.utils.visualize_util import plot
 from data_preprocessing import PROCESSED_DATASET_FOLDER_PATH as DATASET_FOLDER_PATH
@@ -49,7 +49,7 @@ PATIENCE = 100
 BATCH_SIZE = 32
 SEED = 0
 
-def init_model(image_height, image_width, unique_label_num, init_func=INIT_FUNC, bottleneck_layer_name=BOTTLENECK_LAYER_NAME, learning_rate=0.00001):
+def init_model(image_height, image_width, unique_label_num, init_func=INIT_FUNC, bottleneck_layer_name=BOTTLENECK_LAYER_NAME, dropout_ratio=0.5, learning_rate=0.00001):
     def set_model_trainable_properties(model, trainable, bottleneck_layer_name):
         for layer in model.layers:
             layer.trainable = trainable
@@ -64,6 +64,7 @@ def init_model(image_height, image_width, unique_label_num, init_func=INIT_FUNC,
     def get_dense_classifier(input_shape, unique_label_num):
         input_tensor = Input(shape=input_shape)
         output_tensor = GlobalAveragePooling2D()(input_tensor)
+        output_tensor = Dropout(dropout_ratio)(output_tensor)
         output_tensor = Dense(unique_label_num, activation="softmax")(output_tensor)
         model = Model(input_tensor, output_tensor)
         return model
@@ -84,7 +85,7 @@ def init_model(image_height, image_width, unique_label_num, init_func=INIT_FUNC,
 
     # Define the overall model
     model = Model(input_tensor, output_tensor)
-    model.compile(optimizer=Adam(lr=learning_rate), loss="categorical_crossentropy", metrics=["accuracy"])
+    model.compile(optimizer=Nadam(lr=learning_rate), loss="categorical_crossentropy", metrics=["accuracy"])
     model.summary()
 
     # Plot the model structures
