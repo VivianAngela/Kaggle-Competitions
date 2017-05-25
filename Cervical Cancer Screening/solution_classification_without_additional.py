@@ -21,7 +21,7 @@ from data_preprocessing import PROJECT_FOLDER_PATH
 from data_preprocessing import PROCESSED_DATASET_FOLDER_PATH as DATASET_FOLDER_PATH
 from data_preprocessing import PROCESSED_IMAGE_HEIGHT as IMAGE_HEIGHT
 from data_preprocessing import PROCESSED_IMAGE_WIDTH as IMAGE_WIDTH
-from solution_classification_with_additional import OUTPUT_FOLDER_PATH as PREVIOUS_OUTPUT_FOLDER_PATH
+from solution_classification_with_additional import OPTIMAL_WEIGHTS_FOLDER_PATH as PREVIOUS_OPTIMAL_WEIGHTS_FOLDER_PATH
 
 # Choose ResNet50 or InceptionV3 or VGG16
 MODEL_NAME = "ResNet50"  # "ResNet50" or "InceptionV3" or "VGG16"
@@ -153,7 +153,7 @@ def init_model(image_height, image_width, unique_label_num, init_func=INIT_FUNC,
     plot(model, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "{}_model.png".format(MODEL_NAME)), show_shapes=True, show_layer_names=True)
 
     # Load weights from previous phase
-    previous_optimal_weights_file_path = os.path.join(PREVIOUS_OUTPUT_FOLDER_PATH, "{}.h5".format(MODEL_NAME))
+    previous_optimal_weights_file_path = os.path.join(PREVIOUS_OPTIMAL_WEIGHTS_FOLDER_PATH, "{}.h5".format(MODEL_NAME))
     assert os.path.isfile(previous_optimal_weights_file_path), "Could not find file {}!".format(previous_optimal_weights_file_path)
     print("Loading weights from {} ...".format(previous_optimal_weights_file_path))
     model.load_weights(previous_optimal_weights_file_path)
@@ -206,7 +206,7 @@ class InspectLossAccuracy(Callback):
         pylab.plot(epoch_index_array, self.valid_loss_list, "lightskyblue", label="valid_loss")
         pylab.grid()
         pylab.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=2, ncol=2, mode="expand", borderaxespad=0.)
-        pylab.savefig(os.path.join(OUTPUT_FOLDER_PATH, "Loss Curve.png"))
+        pylab.savefig(os.path.join(OUTPUT_FOLDER_PATH, "{}_loss_curve.png".format(MODEL_NAME)))
         pylab.close()
 
         # Accuracy
@@ -221,7 +221,7 @@ class InspectLossAccuracy(Callback):
         pylab.plot(epoch_index_array, self.valid_acc_list, "lightskyblue", label="valid_acc")
         pylab.grid()
         pylab.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=2, ncol=2, mode="expand", borderaxespad=0.)
-        pylab.savefig(os.path.join(OUTPUT_FOLDER_PATH, "Accuracy Curve.png"))
+        pylab.savefig(os.path.join(OUTPUT_FOLDER_PATH, "{}_accuracy_curve.png".format(MODEL_NAME)))
         pylab.close()
 
 def ensemble_predictions(submission_folder_path):

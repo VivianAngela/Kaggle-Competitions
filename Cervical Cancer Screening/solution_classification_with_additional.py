@@ -151,7 +151,7 @@ class InspectLossAccuracy(Callback):
         pylab.plot(epoch_index_array, self.valid_loss_list, "lightskyblue", label="valid_loss")
         pylab.grid()
         pylab.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=2, ncol=2, mode="expand", borderaxespad=0.)
-        pylab.savefig(os.path.join(OUTPUT_FOLDER_PATH, "Loss Curve.png"))
+        pylab.savefig(os.path.join(OUTPUT_FOLDER_PATH, "{}_loss_curve.png".format(MODEL_NAME)))
         pylab.close()
 
         # Accuracy
@@ -166,7 +166,7 @@ class InspectLossAccuracy(Callback):
         pylab.plot(epoch_index_array, self.valid_acc_list, "lightskyblue", label="valid_acc")
         pylab.grid()
         pylab.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=2, ncol=2, mode="expand", borderaxespad=0.)
-        pylab.savefig(os.path.join(OUTPUT_FOLDER_PATH, "Accuracy Curve.png"))
+        pylab.savefig(os.path.join(OUTPUT_FOLDER_PATH, "{}_accuracy_curve.png".format(MODEL_NAME)))
         pylab.close()
 
 def run():
