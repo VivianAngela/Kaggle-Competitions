@@ -23,14 +23,20 @@ if MODEL_NAME == "ResNet50":
     from keras.applications.resnet50 import preprocess_input as PREPROCESS_INPUT
     from keras.applications.resnet50 import ResNet50 as INIT_FUNC
     BOTTLENECK_LAYER_NAME = "activation_40"
+    DROPOUT_RATIO = 0.5
+    LEARNING_RATE = 0.00001
 elif MODEL_NAME == "InceptionV3":
     from keras.applications.inception_v3 import preprocess_input as PREPROCESS_INPUT
     from keras.applications.inception_v3 import InceptionV3 as INIT_FUNC
     BOTTLENECK_LAYER_NAME = "mixed8"
+    DROPOUT_RATIO = 0.5
+    LEARNING_RATE = 0.00001
 elif MODEL_NAME == "VGG16":
     from keras.applications.vgg16 import preprocess_input as PREPROCESS_INPUT
     from keras.applications.vgg16 import VGG16 as INIT_FUNC
     BOTTLENECK_LAYER_NAME = "block4_pool"
+    DROPOUT_RATIO = 0.5
+    LEARNING_RATE = 0.00005
 else:
     assert False
 
@@ -53,7 +59,7 @@ PATIENCE = 100
 BATCH_SIZE = 32
 SEED = 0
 
-def init_model(image_height, image_width, unique_label_num, init_func=INIT_FUNC, bottleneck_layer_name=BOTTLENECK_LAYER_NAME, dropout_ratio=0.5, learning_rate=0.00001):
+def init_model(image_height, image_width, unique_label_num, init_func=INIT_FUNC, bottleneck_layer_name=BOTTLENECK_LAYER_NAME, dropout_ratio=DROPOUT_RATIO, learning_rate=LEARNING_RATE):
     def set_model_trainable_properties(model, trainable, bottleneck_layer_name):
         for layer in model.layers:
             layer.trainable = trainable
