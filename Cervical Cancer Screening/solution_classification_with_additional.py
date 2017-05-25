@@ -17,8 +17,8 @@ from data_preprocessing import PROCESSED_DATASET_FOLDER_PATH as DATASET_FOLDER_P
 from data_preprocessing import PROCESSED_IMAGE_HEIGHT as IMAGE_HEIGHT
 from data_preprocessing import PROCESSED_IMAGE_WIDTH as IMAGE_WIDTH
 
-# Choose ResNet50 or InceptionV3
-MODEL_NAME = "ResNet50"  # "ResNet50" or "InceptionV3"
+# Choose ResNet50 or InceptionV3 or VGG16
+MODEL_NAME = "ResNet50"  # "ResNet50" or "InceptionV3" or "VGG16"
 if MODEL_NAME == "ResNet50":
     from keras.applications.resnet50 import preprocess_input as PREPROCESS_INPUT
     from keras.applications.resnet50 import ResNet50 as INIT_FUNC
@@ -27,6 +27,10 @@ elif MODEL_NAME == "InceptionV3":
     from keras.applications.inception_v3 import preprocess_input as PREPROCESS_INPUT
     from keras.applications.inception_v3 import InceptionV3 as INIT_FUNC
     BOTTLENECK_LAYER_NAME = "mixed8"
+elif MODEL_NAME == "VGG16":
+    from keras.applications.vgg16 import preprocess_input as PREPROCESS_INPUT
+    from keras.applications.vgg16 import VGG16 as INIT_FUNC
+    BOTTLENECK_LAYER_NAME = "block4_pool"
 else:
     assert False
 
