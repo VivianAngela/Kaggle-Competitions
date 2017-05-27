@@ -27,7 +27,7 @@ SUBMISSION_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "Submission")
 
 # Training and Testing procedure
 SPLIT_NUM = 10
-RANDOM_STATE = 666666
+RANDOM_STATE = None
 NUM_BOOST_ROUND = 1000000
 EARLY_STOPPING_ROUNDS = 100
 TARGET_MEAN_PREDICTION = 0.175  # https://www.kaggle.com/davidthaler/how-many-1-s-are-in-the-public-lb
