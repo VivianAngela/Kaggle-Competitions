@@ -23,7 +23,6 @@ DATASET_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "shallow_learning_dataset.
 
 # Output
 OUTPUT_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "{}_output".format(os.path.basename(__file__).split(".")[0]))
-OPTIMAL_WEIGHTS_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "Optimal Weights")
 SUBMISSION_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "Submission")
 
 # Training and Testing procedure
@@ -373,7 +372,6 @@ def ensemble_predictions(submission_folder_path, proba_column_name):
 
 def run():
     print("Creating folders ...")
-    os.makedirs(OPTIMAL_WEIGHTS_FOLDER_PATH, exist_ok=True)
     os.makedirs(SUBMISSION_FOLDER_PATH, exist_ok=True)
 
     print("Loading dataset ...")
@@ -391,43 +389,35 @@ def run():
             print("The submission file already exists.")
             continue
 
-        optimal_weights_file_path = os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "optimal_weights_{}.txt".format(split_index))
-        if os.path.isfile(optimal_weights_file_path):
-            print("The optimal weights file already exists.")
-        else:
-            print("Dividing the vanilla training dataset to actual training/validation dataset ...")
-            actual_train_question1_feature_array, actual_train_question2_feature_array, \
-            actual_train_common_feature_array, actual_train_label_array = \
-            train_question1_feature_array[train_index_array], train_question2_feature_array[train_index_array], \
-            train_common_feature_array[train_index_array], train_label_array[train_index_array]
-            actual_valid_question1_feature_array, actual_valid_question2_feature_array, \
-            actual_valid_common_feature_array, actual_valid_label_array = \
-            train_question1_feature_array[valid_index_array], train_question2_feature_array[valid_index_array], \
-            train_common_feature_array[valid_index_array], train_label_array[valid_index_array]
+        print("Dividing the vanilla training dataset to actual training/validation dataset ...")
+        actual_train_question1_feature_array, actual_train_question2_feature_array, \
+        actual_train_common_feature_array, actual_train_label_array = \
+        train_question1_feature_array[train_index_array], train_question2_feature_array[train_index_array], \
+        train_common_feature_array[train_index_array], train_label_array[train_index_array]
+        actual_valid_question1_feature_array, actual_valid_question2_feature_array, \
+        actual_valid_common_feature_array, actual_valid_label_array = \
+        train_question1_feature_array[valid_index_array], train_question2_feature_array[valid_index_array], \
+        train_common_feature_array[valid_index_array], train_label_array[valid_index_array]
 
-            print("Calculating class weight ...")
-            train_mean_prediction = np.mean(actual_train_label_array)
-            train_class_weight = {0: (1 - TARGET_MEAN_PREDICTION) / (1 - train_mean_prediction), 1: TARGET_MEAN_PREDICTION / train_mean_prediction}
-            valid_mean_prediction = np.mean(actual_valid_label_array)
-            valid_class_weight = {0: (1 - TARGET_MEAN_PREDICTION) / (1 - valid_mean_prediction), 1: TARGET_MEAN_PREDICTION / valid_mean_prediction}
+        print("Calculating class weight ...")
+        train_mean_prediction = np.mean(actual_train_label_array)
+        train_class_weight = {0: (1 - TARGET_MEAN_PREDICTION) / (1 - train_mean_prediction), 1: TARGET_MEAN_PREDICTION / train_mean_prediction}
+        valid_mean_prediction = np.mean(actual_valid_label_array)
+        valid_class_weight = {0: (1 - TARGET_MEAN_PREDICTION) / (1 - valid_mean_prediction), 1: TARGET_MEAN_PREDICTION / valid_mean_prediction}
 
-            print("Performing data augmentation ...")
-            actual_train_feature_array, actual_train_label_array = get_augmented_data(actual_train_question1_feature_array, actual_train_question2_feature_array, actual_train_common_feature_array, actual_train_label_array)
-            actual_train_weight_list = [train_class_weight[label] for label in actual_train_label_array]
-            actual_train_data = lgb.Dataset(actual_train_feature_array, label=actual_train_label_array, weight=actual_train_weight_list)
-            actual_valid_feature_array, actual_valid_label_array = get_augmented_data(actual_valid_question1_feature_array, actual_valid_question2_feature_array, actual_valid_common_feature_array, actual_valid_label_array)
-            actual_valid_weight_list = [valid_class_weight[label] for label in actual_valid_label_array]
-            actual_valid_data = lgb.Dataset(actual_valid_feature_array, label=actual_valid_label_array, weight=actual_valid_weight_list, reference=actual_train_data)
+        print("Performing data augmentation ...")
+        actual_train_feature_array, actual_train_label_array = get_augmented_data(actual_train_question1_feature_array, actual_train_question2_feature_array, actual_train_common_feature_array, actual_train_label_array)
+        actual_train_weight_list = [train_class_weight[label] for label in actual_train_label_array]
+        actual_train_data = lgb.Dataset(actual_train_feature_array, label=actual_train_label_array, weight=actual_train_weight_list)
+        actual_valid_feature_array, actual_valid_label_array = get_augmented_data(actual_valid_question1_feature_array, actual_valid_question2_feature_array, actual_valid_common_feature_array, actual_valid_label_array)
+        actual_valid_weight_list = [valid_class_weight[label] for label in actual_valid_label_array]
+        actual_valid_data = lgb.Dataset(actual_valid_feature_array, label=actual_valid_label_array, weight=actual_valid_weight_list, reference=actual_train_data)
 
-            print("Performing the training procedure ...")
-            model = lgb.train(params=best_params, train_set=actual_train_data, valid_sets=[actual_valid_data], num_boost_round=NUM_BOOST_ROUND, early_stopping_rounds=EARLY_STOPPING_ROUNDS)
-            model.save_model(optimal_weights_file_path, num_iteration=model.best_iteration)
-
-        assert os.path.isfile(optimal_weights_file_path)
-        model = lgb.Booster(model_file=optimal_weights_file_path)
+        print("Performing the training procedure ...")
+        model = lgb.train(params=best_params, train_set=actual_train_data, valid_sets=[actual_valid_data], num_boost_round=NUM_BOOST_ROUND, early_stopping_rounds=EARLY_STOPPING_ROUNDS)
 
         print("Performing the testing procedure ...")
-        prediction_array = model.predict(test_feature_array)
+        prediction_array = model.predict(test_feature_array, num_iteration=model.best_iteration)
         prediction_array = np.mean(np.reshape(prediction_array, (-1, 2), order="F"), axis=1)
         submission_file_content = pd.DataFrame({"test_id": np.arange(len(prediction_array)), "is_duplicate": np.squeeze(prediction_array)})
         submission_file_content.to_csv(submission_file_path, index=False)
