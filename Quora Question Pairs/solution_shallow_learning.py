@@ -269,8 +269,12 @@ def load_extra_features():
 
         print("Separating feature columns ...")
         column_name_list = list(train_file_content)
-        question1_feature_column_name_list = sorted([column_name for column_name in column_name_list if "q1" in column_name])
-        question2_feature_column_name_list = sorted([column_name for column_name in column_name_list if "q2" in column_name])
+        if "mephistopheies" in os.path.basename(train_file_path):
+            question1_feature_column_name_list = []
+            question2_feature_column_name_list = []
+        else:
+            question1_feature_column_name_list = sorted([column_name for column_name in column_name_list if "q1" in column_name])
+            question2_feature_column_name_list = sorted([column_name for column_name in column_name_list if "q2" in column_name])
         common_feature_column_name_list = sorted(set(column_name_list) - set(question1_feature_column_name_list + question2_feature_column_name_list))
         train_question1_feature_array = train_file_content[question1_feature_column_name_list].as_matrix().astype(np.float32)
         train_question2_feature_array = train_file_content[question2_feature_column_name_list].as_matrix().astype(np.float32)
