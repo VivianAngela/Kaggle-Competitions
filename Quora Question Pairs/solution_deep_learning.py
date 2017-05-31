@@ -27,7 +27,7 @@ PROJECT_NAME = "Quora Question Pairs"
 PROJECT_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset", PROJECT_NAME)
 TRAIN_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "train.csv")
 TEST_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "test.csv")
-EMBEDDING_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "GoogleNews-vectors-negative300.bin")
+EMBEDDING_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "glove.42B.300d_word2vec.txt")
 DATASET_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "deep_learning_dataset.npz")
 MAX_SEQUENCE_LENGTH = 30
 
@@ -167,7 +167,7 @@ def load_dataset():
         embedding_matrix = dataset_file_content["embedding_matrix"]
     else:
         print("Initiating word2vec ...")
-        word2vec = KeyedVectors.load_word2vec_format(EMBEDDING_FILE_PATH, binary=True)
+        word2vec = KeyedVectors.load_word2vec_format(EMBEDDING_FILE_PATH, binary=False)
         word_to_index_dict = dict([(word, index) for index, word in enumerate(word2vec.index2word)])
         print("word2vec contains {} unique words.".format(len(word_to_index_dict)))
 
