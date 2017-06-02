@@ -19,7 +19,8 @@ PROJECT_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset",
 EXTRA_FEATURES_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "Extra Features")
 TRAIN_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "train.csv")
 TEST_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "test.csv")
-DATASET_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "shallow_learning_dataset.npz")
+SHALLOW_FEATURES_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "shallow_features.npz")
+DEEP_FEATURES_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "deep_features.npz")
 
 # Output
 OUTPUT_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "{}_output".format(os.path.basename(__file__).split(".")[0]))
@@ -292,9 +293,9 @@ def load_extra_features():
         yield _load_extra_features(train_file_path, test_file_path)
 
 def load_dataset():
-    if os.path.isfile(DATASET_FILE_PATH):
-        print("Loading dataset from disk ...")
-        dataset_file_content = np.load(DATASET_FILE_PATH)
+    if os.path.isfile(SHALLOW_FEATURES_FILE_PATH):
+        print("Loading shallow features from disk ...")
+        dataset_file_content = np.load(SHALLOW_FEATURES_FILE_PATH)
         train_question1_feature_array = dataset_file_content["train_question1_feature_array"]
         train_question2_feature_array = dataset_file_content["train_question2_feature_array"]
         train_common_feature_array = dataset_file_content["train_common_feature_array"]
@@ -331,7 +332,7 @@ def load_dataset():
         test_common_feature_array = merged_file_content[np.logical_not(is_train_mask_array)][common_feature_column_name_list].as_matrix().astype(np.float32)
 
         print("Saving dataset to disk ...")
-        np.savez_compressed(DATASET_FILE_PATH,
+        np.savez_compressed(SHALLOW_FEATURES_FILE_PATH,
                             train_question1_feature_array=train_question1_feature_array, train_question2_feature_array=train_question2_feature_array,
                             train_common_feature_array=train_common_feature_array, train_label_array=train_label_array,
                             test_question1_feature_array=test_question1_feature_array, test_question2_feature_array=test_question2_feature_array,
@@ -346,6 +347,19 @@ def load_dataset():
         test_question1_feature_array = np.hstack((test_question1_feature_array, extra_test_question1_feature_array))
         test_question2_feature_array = np.hstack((test_question2_feature_array, extra_test_question2_feature_array))
         test_common_feature_array = np.hstack((test_common_feature_array, extra_test_common_feature_array))
+
+    print("Loading and merging deep features ...")
+    dataset_file_content = np.load(DEEP_FEATURES_FILE_PATH)
+    deep_train_feature_array = dataset_file_content["train_feature_array"]
+    deep_test_feature_array = dataset_file_content["test_feature_array"]
+    deep_train_question1_feature_array = deep_train_feature_array[:, :deep_train_feature_array.shape[1] // 2]
+    deep_train_question2_feature_array = deep_train_feature_array[:, deep_train_feature_array.shape[1] // 2:]
+    deep_test_question1_feature_array = deep_test_feature_array[:, :deep_test_feature_array.shape[1] // 2]
+    deep_test_question2_feature_array = deep_test_feature_array[:, deep_test_feature_array.shape[1] // 2:]
+    train_question1_feature_array = np.hstack((train_question1_feature_array, deep_train_question1_feature_array))
+    train_question2_feature_array = np.hstack((train_question2_feature_array, deep_train_question2_feature_array))
+    test_question1_feature_array = np.hstack((test_question1_feature_array, deep_test_question1_feature_array))
+    test_question2_feature_array = np.hstack((test_question2_feature_array, deep_test_question2_feature_array))
 
     return train_question1_feature_array, train_question2_feature_array, train_common_feature_array, train_label_array, \
         test_question1_feature_array, test_question2_feature_array, test_common_feature_array
