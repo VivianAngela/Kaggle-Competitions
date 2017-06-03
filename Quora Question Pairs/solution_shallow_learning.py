@@ -435,9 +435,10 @@ def run():
         model = lgb.train(params=best_params, train_set=actual_train_data, valid_sets=[actual_valid_data], num_boost_round=NUM_BOOST_ROUND, early_stopping_rounds=EARLY_STOPPING_ROUNDS)
 
         print("Performing the testing procedure ...")
-        prediction_array = model.predict(test_feature_array, num_iteration=model.best_iteration)
-        prediction_array = np.mean(np.reshape(prediction_array, (-1, 2), order="F"), axis=1)
-        submission_file_content = pd.DataFrame({"test_id": np.arange(len(prediction_array)), "is_duplicate": np.squeeze(prediction_array)})
+        prediction_1_array = model.predict(test_feature_array[:len(test_feature_array) // 2], num_iteration=model.best_iteration)
+        prediction_2_array = model.predict(test_feature_array[len(test_feature_array) // 2:], num_iteration=model.best_iteration)
+        prediction_array = np.mean(np.vstack((prediction_1_array, prediction_2_array)), axis=0)
+        submission_file_content = pd.DataFrame({"test_id": np.arange(len(prediction_array)), "is_duplicate": prediction_array})
         submission_file_content.to_csv(submission_file_path, index=False)
 
     print("Performing ensembling ...")
