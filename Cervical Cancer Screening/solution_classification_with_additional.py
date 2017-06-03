@@ -6,6 +6,7 @@ matplotlib.use("Agg")
 import os
 import pylab
 import numpy as np
+import pydot
 from keras import backend as K
 from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
 from keras.layers import Dense, Dropout, Input, GlobalAveragePooling2D
@@ -59,7 +60,12 @@ PATIENCE = 4
 BATCH_SIZE = 32
 SEED = 0
 
+<<<<<<< Updated upstream
 def init_model(image_height, image_width, unique_label_num, init_func=INIT_FUNC, bottleneck_layer_name=BOTTLENECK_LAYER_NAME, dropout_ratio=DROPOUT_RATIO, learning_rate=LEARNING_RATE):
+=======
+
+def init_model(image_height, image_width, unique_label_num, init_func=INIT_FUNC, bottleneck_layer_name=BOTTLENECK_LAYER_NAME, learning_rate=0.00001):
+>>>>>>> Stashed changes
     def set_model_trainable_properties(model, trainable, bottleneck_layer_name):
         for layer in model.layers:
             layer.trainable = trainable
@@ -182,6 +188,7 @@ def run():
     print("Performing the training procedure ...")
     train_generator = load_dataset(ACTUAL_TRAIN_FOLDER_PATH, classes=unique_label_list, class_mode="categorical", shuffle=True, seed=SEED)
     valid_generator = load_dataset(ACTUAL_VALID_FOLDER_PATH, classes=unique_label_list, class_mode="categorical", shuffle=True, seed=SEED)
+
     train_sample_num = len(train_generator.filenames)
     valid_sample_num = len(valid_generator.filenames)
     earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)

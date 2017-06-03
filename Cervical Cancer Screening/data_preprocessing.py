@@ -6,7 +6,7 @@ import numpy as np
 from scipy.misc import imread, imresize, imsave
 
 PROJECT_NAME = "Cervical Cancer Screening"
-PROJECT_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset", PROJECT_NAME)
+PROJECT_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/datasets", PROJECT_NAME)
 ORIGINAL_DATASET_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "original")
 PROCESSED_DATASET_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "processed")
 PROCESSED_IMAGE_HEIGHT, PROCESSED_IMAGE_WIDTH = 300, 224
