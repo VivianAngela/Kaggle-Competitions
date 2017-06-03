@@ -1,11 +1,8 @@
 from __future__ import absolute_import, division, print_function
 
-
 import matplotlib
 matplotlib.use("Agg")
 
-
-import re
 import os
 import glob
 import shutil
@@ -18,8 +15,7 @@ from keras.layers import Dense, Dropout, Input, GlobalAveragePooling2D
 from keras.models import Model
 from keras.optimizers import Nadam
 from keras.preprocessing.image import ImageDataGenerator
-#from keras.utils.vis_utils import plot_model
-from keras.utils.visualize_util import plot #for 1.2.2
+from keras.utils.visualize_util import plot
 from sklearn.model_selection import StratifiedKFold
 from data_preprocessing import PROJECT_FOLDER_PATH
 from data_preprocessing import PROCESSED_DATASET_FOLDER_PATH as DATASET_FOLDER_PATH
@@ -27,13 +23,8 @@ from data_preprocessing import PROCESSED_IMAGE_HEIGHT as IMAGE_HEIGHT
 from data_preprocessing import PROCESSED_IMAGE_WIDTH as IMAGE_WIDTH
 from solution_classification_with_additional import OPTIMAL_WEIGHTS_FOLDER_PATH as PREVIOUS_OPTIMAL_WEIGHTS_FOLDER_PATH
 
-<<<<<<< Updated upstream
 # Choose ResNet50 or InceptionV3 or VGG16
 MODEL_NAME = "ResNet50"  # "ResNet50" or "InceptionV3" or "VGG16"
-=======
-# Choose ResNet50 or InceptionV3
-MODEL_NAME = "InceptionV3"  # "ResNet50" or "InceptionV3"
->>>>>>> Stashed changes
 if MODEL_NAME == "ResNet50":
     from keras.applications.resnet50 import preprocess_input as PREPROCESS_INPUT
     from keras.applications.resnet50 import ResNet50 as INIT_FUNC
@@ -56,12 +47,11 @@ else:
     assert False
 
 # Dataset
-
 TRAIN_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "train")
 TEST_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "test")
 
 # Workspace
-WORKSPACE_FOLDER_PATH = os.path.join("/mnt/Data1/xu", os.path.basename(DATASET_FOLDER_PATH))
+WORKSPACE_FOLDER_PATH = os.path.join("/tmp", os.path.basename(DATASET_FOLDER_PATH))
 ACTUAL_DATASET_FOLDER_PATH = os.path.join(WORKSPACE_FOLDER_PATH, "actual_dataset")
 ACTUAL_TRAIN_FOLDER_PATH = os.path.join(ACTUAL_DATASET_FOLDER_PATH, "train")
 ACTUAL_VALID_FOLDER_PATH = os.path.join(ACTUAL_DATASET_FOLDER_PATH, "valid")
@@ -69,41 +59,28 @@ ACTUAL_VALID_FOLDER_PATH = os.path.join(ACTUAL_DATASET_FOLDER_PATH, "valid")
 # Output
 OUTPUT_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "phase_2")
 OPTIMAL_WEIGHTS_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "optimal weights")
-OPTIMAL_WEIGHTS_FILE_RULE = os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "epoch_{epoch:03d}-loss_{loss:.5f}-val_loss_{val_loss:.5f}.h5")
 SUBMISSION_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "submission")
 TRIAL_NUM = 10
 
-
 # Training and Testing procedure
-PERFORM_TRAINING = True
-<<<<<<< Updated upstream
-=======
-WEIGHTS_FILE_PATH = os.path.join(PROJECT_FOLDER_PATH, "phase_1/optimal weights/InceptionV3.h5")
-#WEIGHTS_FILE_PATH = None
->>>>>>> Stashed changes
+SPLIT_NUM = 5
 MAXIMUM_EPOCH_NUM = 1000
-PATIENCE = 100
+PATIENCE = 4
 BATCH_SIZE = 32
 SEED = 0
-numbers = re.compile(r'(\d+)')
-NUM_FOLD = 5
 
-def numericalSort(value):
-    parts = numbers.split(value)
-    parts[1::2] = map(int, parts[1::2])
-    return parts
+def reformat_testing_dataset():
+    # Create a dummy folder
+    dummy_test_folder_path = os.path.join(TEST_FOLDER_PATH, "dummy")
+    os.makedirs(dummy_test_folder_path, exist_ok=True)
 
-def label_index(image_path_list):
-    label_array = np.zeros(len(image_path_list))
-    for idx in range(0, len(image_path_list)):
-        parts = image_path_list[idx]
-        parts = numbers.split(parts)
-        parts[1:2] = map(int, parts[1:2])
-        label_array[idx] = parts[1:2][0]
-    return (label_array)
+    # Move files to the dummy folder if needed
+    file_path_list = glob.glob(os.path.join(TEST_FOLDER_PATH, "*"))
+    for file_path in file_path_list:
+        if os.path.isfile(file_path):
+            shutil.move(file_path, os.path.join(dummy_test_folder_path, os.path.basename(file_path)))
 
 def reorganize_dataset(original_image_path_list, train_index_array, valid_index_array):
-
     # Create symbolic links
     shutil.rmtree(ACTUAL_DATASET_FOLDER_PATH, ignore_errors=True)
     for folder_path, index_array in zip((ACTUAL_TRAIN_FOLDER_PATH, ACTUAL_VALID_FOLDER_PATH), (train_index_array, valid_index_array)):
@@ -191,17 +168,6 @@ def load_dataset(folder_path, target_size=(IMAGE_HEIGHT, IMAGE_WIDTH), classes=N
 
     return data_generator
 
-def reformat_testing_dataset():
-# Create a dummy folder
-    dummy_test_folder_path = os.path.join(TEST_FOLDER_PATH, "dummy")
-    os.makedirs(dummy_test_folder_path, exist_ok=True)
-# Move files to the dummy folder if needed
-    file_path_list = glob.glob(os.path.join(TEST_FOLDER_PATH, "*"))
-    for file_path in file_path_list:
-        if os.path.isfile(file_path):
-            shutil.move(file_path, os.path.join(dummy_test_folder_path, os.path.basename(file_path)))
-
-
 class InspectLossAccuracy(Callback):
     def __init__(self):
         super(InspectLossAccuracy, self).__init__()
@@ -272,57 +238,55 @@ def run():
     os.makedirs(OPTIMAL_WEIGHTS_FOLDER_PATH, exist_ok=True)
     os.makedirs(SUBMISSION_FOLDER_PATH, exist_ok=True)
 
-    print("Getting the labels ...")
-    unique_label_list = sorted([folder_name for folder_name in os.listdir(TRAIN_FOLDER_PATH) if os.path.isdir(os.path.join(TRAIN_FOLDER_PATH, folder_name))])
-
-    print("Reorganizing dataset ...")
-    # Get list of files
-    original_image_path_list = sorted(glob.glob(os.path.join(TRAIN_FOLDER_PATH, "*/*.jpg")), key=numericalSort)
-
     print("Reformatting testing dataset ...")
     reformat_testing_dataset()
 
+    print("Analyzing original dataset ...")
+    original_image_path_list = sorted(glob.glob(os.path.join(TRAIN_FOLDER_PATH, "*/*.jpg")))
+    original_image_label_list = [os.path.basename(os.path.abspath(os.path.join(original_image_path, os.pardir))) for original_image_path in original_image_path_list]
+
+    print("Getting the labels ...")
+    unique_label_list = sorted([folder_name for folder_name in os.listdir(TRAIN_FOLDER_PATH) if os.path.isdir(os.path.join(TRAIN_FOLDER_PATH, folder_name))])
+
     print("Initializing model ...")
     model = init_model(image_height=IMAGE_HEIGHT, image_width=IMAGE_WIDTH, unique_label_num=len(unique_label_list))
+    vanilla_weights = model.get_weights()
 
+    cv_object = StratifiedKFold(n_splits=SPLIT_NUM, random_state=0)
+    for split_index, (train_index_array, valid_index_array) in enumerate(cv_object.split(np.zeros((len(original_image_label_list), 1)), original_image_label_list), start=1):
+        print("Working on splitting fold {} ...".format(split_index))
 
-    # Perform Cross Validation
-    cv_object = StratifiedKFold(n_splits=NUM_FOLD)
-    num_image = len(original_image_path_list)
-    y = label_index(original_image_path_list)
-
-    for cv_index, (train_index_array, valid_index_array) in enumerate(cv_object.split(np.zeros(num_image), y), start=0):
-        print("Working on splitting fold {} ...".format(cv_index))
-        train_sample_num, valid_sample_num = reorganize_dataset(original_image_path_list, train_index_array, valid_index_array)
-
-        submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "submission_{}.csv".format(cv_index))
+        submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "submission_{}.csv".format(split_index))
         if os.path.isfile(submission_file_path):
             print("The submission file already exists.")
             continue
 
-        print("Performing the training procedure ...")
-        train_generator = load_dataset(ACTUAL_TRAIN_FOLDER_PATH, classes=unique_label_list, class_mode="categorical", shuffle=True, seed=SEED)
-        valid_generator = load_dataset(ACTUAL_VALID_FOLDER_PATH, classes=unique_label_list, class_mode="categorical", shuffle=True, seed=SEED)
-        earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
-        modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_RULE, monitor="val_loss", save_best_only=True, save_weights_only=True)
-        inspectlossaccuracy_callback = InspectLossAccuracy()
-        model.fit_generator(generator=train_generator,
-<<<<<<< Updated upstream
-                            samples_per_epoch=train_sample_num,
-                            validation_data=valid_generator,
-                            nb_val_samples=valid_sample_num,
-                            callbacks=[earlystopping_callback, modelcheckpoint_callback, inspectlossaccuracy_callback],
-                            nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
-    else:
-=======
-                        samples_per_epoch=train_sample_num,
-                        validation_data=valid_generator,
-                        nb_val_samples=valid_sample_num,
-                        callbacks=[earlystopping_callback, modelcheckpoint_callback, inspectlossaccuracy_callback],
-                        nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
-        model.load_weights(OPTIMAL_WEIGHTS_FOLDER_PATH)
+        optimal_weights_file_path = os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "optimal_weights_{}.h5".format(split_index))
+        if os.path.isfile(optimal_weights_file_path):
+            print("The optimal weights file already exists.")
+        else:
+            print("Reorganizing dataset ...")
+            train_sample_num, valid_sample_num = reorganize_dataset(original_image_path_list, train_index_array, valid_index_array)
 
->>>>>>> Stashed changes
+            print("Startting with vanilla weights ...")
+            model.set_weights(vanilla_weights)
+
+            print("Performing the training procedure ...")
+            train_generator = load_dataset(ACTUAL_TRAIN_FOLDER_PATH, classes=unique_label_list, class_mode="categorical", shuffle=True, seed=SEED)
+            valid_generator = load_dataset(ACTUAL_VALID_FOLDER_PATH, classes=unique_label_list, class_mode="categorical", shuffle=True, seed=SEED)
+            earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
+            modelcheckpoint_callback = ModelCheckpoint(optimal_weights_file_path, monitor="val_loss", save_best_only=True, save_weights_only=True)
+            inspectlossaccuracy_callback = InspectLossAccuracy()
+            model.fit_generator(generator=train_generator,
+                                samples_per_epoch=train_sample_num,
+                                validation_data=valid_generator,
+                                nb_val_samples=valid_sample_num,
+                                callbacks=[earlystopping_callback, modelcheckpoint_callback, inspectlossaccuracy_callback],
+                                nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
+
+        assert os.path.isfile(optimal_weights_file_path)
+        model.load_weights(optimal_weights_file_path)
+
         print("Performing the testing procedure ...")
         for trial_index in np.arange(TRIAL_NUM) + 1:
             print("Working on trial {}/{} ...".format(trial_index, TRIAL_NUM))
