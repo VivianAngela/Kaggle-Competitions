@@ -8,13 +8,12 @@ import json
 import pylab
 import numpy as np
 from keras.applications.vgg16 import VGG16
-from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
+from keras.callbacks import Callback, ModelCheckpoint
 from keras.layers import Dense, Dropout, Flatten, Input
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.preprocessing.image import ImageDataGenerator
-from keras.utils.visualize_util import plot
 from scipy.misc import imread, imsave, imresize
 from sklearn.cluster import DBSCAN
 from sklearn.model_selection import GroupShuffleSplit
@@ -41,8 +40,10 @@ ACTUAL_VALID_LOCALIZATION_FOLDER_PATH = os.path.join(ACTUAL_DATASET_FOLDER_PATH,
 # Output
 OUTPUT_FOLDER_PATH = os.path.join(DATASET_FOLDER_PATH, "{}_output".format(os.path.basename(__file__).split(".")[0]))
 VISUALIZATION_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "Visualization")
-OPTIMAL_WEIGHTS_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "Optimal Weights")
-OPTIMAL_WEIGHTS_FILE_RULE = os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "epoch_{epoch:03d}-loss_{loss:.5f}-val_loss_{val_loss:.5f}.h5")
+MODEL_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "model")
+MODEL_STRUCTURE_FILE_PATH = os.path.join(MODEL_FOLDER_PATH, "model.png")
+MODEL_WEIGHTS_FILE_PATH_RULE = os.path.join(MODEL_FOLDER_PATH, "epoch_{epoch:03d}-loss_{loss:.5f}-val_loss_{val_loss:.5f}.h5")
+LOSS_CURVE_FILE_PATH = os.path.join(OUTPUT_FOLDER_PATH, "Loss Curve.png")
 
 # Image processing
 IMAGE_ROW_SIZE = 256
@@ -51,10 +52,8 @@ CROPPED_IMAGE_ROW_SIZE = 256
 CROPPED_IMAGE_COLUMN_SIZE = 256
 
 # Training and Testing procedure
-PERFORM_TRAINING = True
-WEIGHTS_FILE_PATH = None
+PREVIOUS_MODEL_WEIGHTS_FILE_PATH = None
 MAXIMUM_EPOCH_NUM = 1000
-PATIENCE = 100
 BATCH_SIZE = 32
 INSPECT_SIZE = 4
 SEED = 0
@@ -217,13 +216,12 @@ def init_model(target_num=4, FC_block_num=2, FC_feature_dim=512, dropout_ratio=0
     # Define and compile the model
     model = Model(input_tensor, output_tensor)
     model.compile(optimizer=Adam(lr=learning_rate), loss="mse")
-    plot(model, to_file=os.path.join(OPTIMAL_WEIGHTS_FOLDER_PATH, "model.png"), show_shapes=True, show_layer_names=True)
+    model.summary()
 
-    # Load weights if applicable
-    if WEIGHTS_FILE_PATH is not None:
-        assert os.path.isfile(WEIGHTS_FILE_PATH), "Could not find file {}!".format(WEIGHTS_FILE_PATH)
-        print("Loading weights from {} ...".format(WEIGHTS_FILE_PATH))
-        model.load_weights(WEIGHTS_FILE_PATH)
+    if PREVIOUS_MODEL_WEIGHTS_FILE_PATH is not None:
+        assert os.path.isfile(PREVIOUS_MODEL_WEIGHTS_FILE_PATH), "Could not find file {}!".format(PREVIOUS_MODEL_WEIGHTS_FILE_PATH)
+        print("Loading weights from {} ...".format(PREVIOUS_MODEL_WEIGHTS_FILE_PATH))
+        model.load_weights(PREVIOUS_MODEL_WEIGHTS_FILE_PATH)
 
     return model
 
@@ -357,13 +355,13 @@ class InspectLoss(Callback):
         pylab.plot(epoch_index_array, self.valid_loss_list, "lightskyblue", label="valid_loss")
         pylab.grid()
         pylab.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=2, ncol=2, mode="expand", borderaxespad=0.)
-        pylab.savefig(os.path.join(OUTPUT_FOLDER_PATH, "Loss Curve.png"))
+        pylab.savefig(LOSS_CURVE_FILE_PATH)
         pylab.close()
 
 def run():
     print("Creating folders ...")
     os.makedirs(VISUALIZATION_FOLDER_PATH, exist_ok=True)
-    os.makedirs(OPTIMAL_WEIGHTS_FOLDER_PATH, exist_ok=True)
+    os.makedirs(MODEL_FOLDER_PATH, exist_ok=True)
 
     print("Reformatting testing dataset ...")
     reformat_testing_dataset()
@@ -377,52 +375,20 @@ def run():
     print("Initializing model ...")
     model = init_model()
 
-    if PERFORM_TRAINING:
-        print("Performing the training procedure ...")
-        train_generator = load_dataset_for_training(ACTUAL_TRAIN_ORIGINAL_FOLDER_PATH, ACTUAL_TRAIN_LOCALIZATION_FOLDER_PATH, batch_size=BATCH_SIZE, seed=SEED, apply_conversion=True)
-        valid_generator = load_dataset_for_training(ACTUAL_VALID_ORIGINAL_FOLDER_PATH, ACTUAL_VALID_LOCALIZATION_FOLDER_PATH, batch_size=BATCH_SIZE, seed=SEED, apply_conversion=True)
-        train_generator_for_inspection = load_dataset_for_training(ACTUAL_TRAIN_ORIGINAL_FOLDER_PATH, ACTUAL_TRAIN_LOCALIZATION_FOLDER_PATH, batch_size=INSPECT_SIZE, seed=SEED + 1, apply_conversion=False)
-        valid_generator_for_inspection = load_dataset_for_training(ACTUAL_VALID_ORIGINAL_FOLDER_PATH, ACTUAL_VALID_LOCALIZATION_FOLDER_PATH, batch_size=INSPECT_SIZE, seed=SEED + 1, apply_conversion=False)
-        earlystopping_callback = EarlyStopping(monitor="val_loss", patience=PATIENCE)
-        modelcheckpoint_callback = ModelCheckpoint(OPTIMAL_WEIGHTS_FILE_RULE, monitor="val_loss", save_best_only=True, save_weights_only=True)
-        inspectprediction_callback = InspectPrediction([train_generator_for_inspection, valid_generator_for_inspection])
-        inspectloss_callback = InspectLoss()
-        model.fit_generator(generator=train_generator,
-                            samples_per_epoch=train_sample_num,
-                            validation_data=valid_generator,
-                            nb_val_samples=valid_sample_num,
-                            callbacks=[earlystopping_callback, modelcheckpoint_callback, inspectprediction_callback, inspectloss_callback],
-                            nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
-    else:
-        assert WEIGHTS_FILE_PATH is not None
-
-        print("Performing the testing procedure ...")
-        train_generator = load_dataset_for_testing(TRAIN_FOLDER_PATH, batch_size=BATCH_SIZE)
-        test_generator = load_dataset_for_testing(TEST_FOLDER_PATH, batch_size=BATCH_SIZE)
-        for data_generator, cropped_folder_path, original_folder_path in zip((train_generator, test_generator), (CROPPED_TRAIN_FOLDER_PATH, CROPPED_TEST_FOLDER_PATH), (TRAIN_FOLDER_PATH, TEST_FOLDER_PATH)):
-            prediction_array = model.predict_generator(generator=data_generator, val_samples=len(data_generator.filenames))
-            for relative_file_path, prediction in zip(data_generator.filenames, prediction_array):
-                cropped_file_path = os.path.join(cropped_folder_path, relative_file_path)
-                if os.path.isfile(cropped_file_path):
-                    continue
-
-                image_content = imread(os.path.join(original_folder_path, relative_file_path))
-                row_size, column_size = image_content.shape[:2]
-
-                center_pixel_row_index = (prediction[0] + 0.5 * prediction[1]) * row_size
-                center_pixel_column_index = (prediction[2] + 0.5 * prediction[3]) * column_size
-                side_length = np.max(((prediction[1] + 0.2) * row_size, (prediction[3] + 0.2) * column_size))
-
-                row_start_index = np.max((0, int(center_pixel_row_index - 0.5 * side_length)))
-                row_end_index = np.min((int(center_pixel_row_index + 0.5 * side_length), row_size))
-                column_start_index = np.max((0, int(center_pixel_column_index - 0.5 * side_length)))
-                column_end_index = np.min((int(center_pixel_column_index + 0.5 * side_length), column_size))
-
-                cropped_image_content = image_content[row_start_index:row_end_index, column_start_index:column_end_index]
-                resized_cropped_image_content = imresize(cropped_image_content, (CROPPED_IMAGE_ROW_SIZE, CROPPED_IMAGE_COLUMN_SIZE))
-
-                os.makedirs(os.path.abspath(os.path.join(cropped_file_path, os.pardir)), exist_ok=True)
-                imsave(cropped_file_path, resized_cropped_image_content)
+    print("Performing the training procedure ...")
+    train_generator = load_dataset_for_training(ACTUAL_TRAIN_ORIGINAL_FOLDER_PATH, ACTUAL_TRAIN_LOCALIZATION_FOLDER_PATH, batch_size=BATCH_SIZE, seed=SEED, apply_conversion=True)
+    valid_generator = load_dataset_for_training(ACTUAL_VALID_ORIGINAL_FOLDER_PATH, ACTUAL_VALID_LOCALIZATION_FOLDER_PATH, batch_size=BATCH_SIZE, seed=SEED, apply_conversion=True)
+    train_generator_for_inspection = load_dataset_for_training(ACTUAL_TRAIN_ORIGINAL_FOLDER_PATH, ACTUAL_TRAIN_LOCALIZATION_FOLDER_PATH, batch_size=INSPECT_SIZE, seed=SEED + 1, apply_conversion=False)
+    valid_generator_for_inspection = load_dataset_for_training(ACTUAL_VALID_ORIGINAL_FOLDER_PATH, ACTUAL_VALID_LOCALIZATION_FOLDER_PATH, batch_size=INSPECT_SIZE, seed=SEED + 1, apply_conversion=False)
+    modelcheckpoint_callback = ModelCheckpoint(MODEL_WEIGHTS_FILE_PATH_RULE, monitor="val_loss", save_best_only=True, save_weights_only=True)
+    inspectprediction_callback = InspectPrediction([train_generator_for_inspection, valid_generator_for_inspection])
+    inspectloss_callback = InspectLoss()
+    model.fit_generator(generator=train_generator,
+                        samples_per_epoch=train_sample_num,
+                        validation_data=valid_generator,
+                        nb_val_samples=valid_sample_num,
+                        callbacks=[modelcheckpoint_callback, inspectprediction_callback, inspectloss_callback],
+                        nb_epoch=MAXIMUM_EPOCH_NUM, verbose=2)
 
     print("All done!")
 
