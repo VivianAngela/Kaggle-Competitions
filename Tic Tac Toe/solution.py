@@ -3,6 +3,7 @@ import glob
 import numpy as np
 import pandas as pd
 import lightgbm as lgb
+from itertools import product
 from sklearn.model_selection import StratifiedKFold
 
 # Dataset
@@ -19,8 +20,8 @@ SUBMISSION_FOLDER_PATH = os.path.join(OUTPUT_FOLDER_PATH, "Submission")
 # Training and Testing procedure
 SPLIT_NUM = 10
 RANDOM_STATE = None
-NUM_BOOST_ROUND = 1000000
-EARLY_STOPPING_ROUNDS = 100
+NUM_BOOST_ROUND = 200
+EARLY_STOPPING_ROUNDS = 50
 
 def load_dataset():
     print("Loading feature files ...")
@@ -42,6 +43,21 @@ def load_dataset():
     train_label_array = train_label_array.flatten()
 
     return train_feature_array, train_label_array, test_feature_array
+
+def get_augmented_data(feature_array, label_array):
+    feature_array_list = []
+    label_array_list = []
+
+    vanilla_index_matrix = np.arange(9).reshape(3, 3)
+    for rotate_time, flip_func in product(np.arange(4), [None, np.fliplr, np.flipud]):
+        index_matrix = np.copy(vanilla_index_matrix)
+        index_matrix = np.rot90(index_matrix, k=rotate_time)
+        if flip_func is not None:
+            index_matrix = flip_func(index_matrix)
+        feature_array_list.append(feature_array[:, index_matrix.flatten()])
+        label_array_list.append(label_array)
+
+    return np.array(feature_array_list).reshape(-1, feature_array.shape[-1]), np.array(label_array_list).flatten()
 
 def ensemble_predictions(submission_folder_path, proba_column_name):
     # Read predictions
@@ -81,6 +97,10 @@ def run():
         print("Dividing the vanilla training dataset to actual training/validation dataset ...")
         actual_train_feature_array, actual_train_label_array = train_feature_array[train_index_array], train_label_array[train_index_array]
         actual_valid_feature_array, actual_valid_label_array = train_feature_array[valid_index_array], train_label_array[valid_index_array]
+
+        print("Performing data augmentation ...")
+        actual_train_feature_array, actual_train_label_array = get_augmented_data(actual_train_feature_array, actual_train_label_array)
+        actual_valid_feature_array, actual_valid_label_array = get_augmented_data(actual_valid_feature_array, actual_valid_label_array)
         actual_train_data = lgb.Dataset(actual_train_feature_array, label=actual_train_label_array)
         actual_valid_data = lgb.Dataset(actual_valid_feature_array, label=actual_valid_label_array, reference=actual_train_data)
 
