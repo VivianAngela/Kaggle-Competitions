@@ -13,14 +13,19 @@ TEST_FILE_PATH = os.path.join(VANILLA_DATASET_FOLDER_PATH, "en_test.csv")
 # Output
 SUBMISSION_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "submission")
 
+def load_text_file(file_path, usecols=None, encoding="utf-8", chunksize=1e4):
+    file_content = pd.read_csv(file_path, usecols=usecols, encoding=encoding, chunksize=chunksize)
+    for chunk in file_content:
+        for data in chunk.itertuples(index=False):
+            yield data
+
 def run():
     print("Creating folders ...")
     os.makedirs(SUBMISSION_FOLDER_PATH, exist_ok=True)
 
     print("Loading {} ...".format(TRAIN_FILE_PATH))
     summary_dict = {}
-    file_content = pd.read_csv(TRAIN_FILE_PATH, usecols=["before", "after"], encoding="utf-8")
-    for before, after in file_content.itertuples(index=False):
+    for before, after in load_text_file(TRAIN_FILE_PATH, usecols=["before", "after"]):
         if before not in summary_dict:
             summary_dict[before] = {}
         if after not in summary_dict[before]:
@@ -36,8 +41,7 @@ def run():
 
     print("Loading {} ...".format(TEST_FILE_PATH))
     entry_list = []
-    file_content = pd.read_csv(TEST_FILE_PATH, usecols=["sentence_id", "token_id", "before"], encoding="utf-8")
-    for sentence_id, token_id, before in file_content.itertuples(index=False):
+    for sentence_id, token_id, before in load_text_file(TEST_FILE_PATH, usecols=["sentence_id", "token_id", "before"]):
         merged_id = "{}_{}".format(sentence_id, token_id)
         after = lookup_dict.get(before, before)
         entry_list.append((merged_id, after))
