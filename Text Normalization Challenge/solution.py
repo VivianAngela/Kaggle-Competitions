@@ -1,4 +1,5 @@
 import os
+import glob
 import time
 import operator
 import pandas as pd
@@ -9,6 +10,8 @@ PROJECT_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset",
 VANILLA_DATASET_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "vanilla")
 TRAIN_FILE_PATH = os.path.join(VANILLA_DATASET_FOLDER_PATH, "en_train.csv")
 TEST_FILE_PATH = os.path.join(VANILLA_DATASET_FOLDER_PATH, "en_test.csv")
+ADDITIONAL_DATASET_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "additional")
+ADDITIONAL_FILE_PATH_LIST = glob.glob(os.path.join(ADDITIONAL_DATASET_FOLDER_PATH, "output_*.csv"))
 
 # Output
 SUBMISSION_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "submission")
@@ -31,11 +34,24 @@ def run():
         if after not in summary_dict[before]:
             summary_dict[before][after] = 0
         summary_dict[before][after] += 1
+    vanilla_summary_dict = summary_dict.copy()
+
+    for file_path in ADDITIONAL_FILE_PATH_LIST:
+        print("Loading {} ...".format(file_path))
+        for before, after in load_text_file(file_path, usecols=["Input Token", "Output Token"]):
+            if after == "<self>" or after == "sil":
+                after = before
+            if before not in summary_dict:
+                summary_dict[before] = {}
+            if after not in summary_dict[before]:
+                summary_dict[before][after] = 0
+            summary_dict[before][after] += 1
+    summary_dict.update(vanilla_summary_dict)
 
     print("Generating lookup dict ...")
     lookup_dict = {}
-    for before in summary_dict.keys():
-        after = max(summary_dict[before].items(), key=operator.itemgetter(1))[0]
+    for before, after_dict in summary_dict.items():
+        after = max(after_dict.items(), key=operator.itemgetter(1))[0]
         if before != after:
             lookup_dict[before] = after
 
