@@ -1,4 +1,5 @@
 import os
+import csv
 import glob
 import time
 import operator
@@ -11,13 +12,21 @@ VANILLA_DATASET_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "vanilla")
 TRAIN_FILE_PATH = os.path.join(VANILLA_DATASET_FOLDER_PATH, "en_train.csv")
 TEST_FILE_PATH = os.path.join(VANILLA_DATASET_FOLDER_PATH, "en_test.csv")
 ADDITIONAL_DATASET_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "additional")
-ADDITIONAL_FILE_PATH_LIST = glob.glob(os.path.join(ADDITIONAL_DATASET_FOLDER_PATH, "output_*.csv"))
+ADDITIONAL_FILE_PATH_LIST = glob.glob(os.path.join(ADDITIONAL_DATASET_FOLDER_PATH, "output-*-of-*"))
 
 # Output
 SUBMISSION_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "submission")
 
-def load_text_file(file_path, usecols=None, encoding="utf-8", chunksize=1e4):
-    file_content = pd.read_csv(file_path, usecols=usecols, encoding=encoding, chunksize=chunksize)
+def clean_text_file(old_file_path):
+    new_file_path = os.path.join(os.path.abspath(os.path.join(old_file_path, "..")), "cleaned_" + os.path.basename(old_file_path))
+    if not os.path.isfile(new_file_path):
+        command = "grep -v ^\"<eos>\" \"{}\" > \"{}\"".format(old_file_path, new_file_path)
+        os.system(command)
+        assert os.path.isfile(new_file_path)
+    return new_file_path
+
+def load_text_file(file_path, sep=",", header="infer", usecols=None, quoting=0, chunksize=1e4, encoding="utf-8"):
+    file_content = pd.read_csv(file_path, sep=sep, header=header, usecols=usecols, quoting=quoting, chunksize=chunksize, encoding=encoding)
     for chunk in file_content:
         for data in chunk.itertuples(index=False):
             yield data
@@ -38,7 +47,7 @@ def run():
 
     for file_path in ADDITIONAL_FILE_PATH_LIST:
         print("Loading {} ...".format(file_path))
-        for before, after in load_text_file(file_path, usecols=["Input Token", "Output Token"]):
+        for before, after in load_text_file(clean_text_file(file_path), sep="\t", header=None, usecols=[1, 2], quoting=csv.QUOTE_NONE):
             if after == "<self>" or after == "sil":
                 after = before
             if before not in summary_dict:
