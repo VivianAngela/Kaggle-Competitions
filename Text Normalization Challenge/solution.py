@@ -11,6 +11,7 @@ PROJECT_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset",
 VANILLA_DATASET_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "vanilla")
 TRAIN_FILE_PATH = os.path.join(VANILLA_DATASET_FOLDER_PATH, "en_train.csv")
 TEST_FILE_PATH = os.path.join(VANILLA_DATASET_FOLDER_PATH, "en_test.csv")
+LOOKUP_FILE_PATH = os.path.join(VANILLA_DATASET_FOLDER_PATH, "lookup.csv")
 ADDITIONAL_DATASET_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "additional")
 ADDITIONAL_FILE_PATH_LIST = glob.glob(os.path.join(ADDITIONAL_DATASET_FOLDER_PATH, "output-*-of-*"))
 
@@ -35,34 +36,41 @@ def run():
     print("Creating folders ...")
     os.makedirs(SUBMISSION_FOLDER_PATH, exist_ok=True)
 
-    print("Loading {} ...".format(TRAIN_FILE_PATH))
-    summary_dict = {}
-    for before, after in load_text_file(TRAIN_FILE_PATH, usecols=["before", "after"]):
-        if before not in summary_dict:
-            summary_dict[before] = {}
-        if after not in summary_dict[before]:
-            summary_dict[before][after] = 0
-        summary_dict[before][after] += 1
-    vanilla_summary_dict = summary_dict.copy()
-
-    for file_path in ADDITIONAL_FILE_PATH_LIST:
-        print("Loading {} ...".format(file_path))
-        for before, after in load_text_file(clean_text_file(file_path), sep="\t", header=None, usecols=[1, 2], quoting=csv.QUOTE_NONE):
-            if after == "<self>" or after == "sil":
-                after = before
+    if os.path.isfile(LOOKUP_FILE_PATH):
+        print("Loading lookup file {} ...".format(LOOKUP_FILE_PATH))
+        lookup_dict = {before: after for before, after in load_text_file(LOOKUP_FILE_PATH, sep="\t")}
+    else:
+        print("Loading {} ...".format(TRAIN_FILE_PATH))
+        summary_dict = {}
+        for before, after in load_text_file(TRAIN_FILE_PATH, usecols=["before", "after"]):
             if before not in summary_dict:
                 summary_dict[before] = {}
             if after not in summary_dict[before]:
                 summary_dict[before][after] = 0
             summary_dict[before][after] += 1
-    summary_dict.update(vanilla_summary_dict)
+        vanilla_summary_dict = summary_dict.copy()
 
-    print("Generating lookup dict ...")
-    lookup_dict = {}
-    for before, after_dict in summary_dict.items():
-        after = max(after_dict.items(), key=operator.itemgetter(1))[0]
-        if before != after:
+        for file_path in ADDITIONAL_FILE_PATH_LIST:
+            print("Loading {} ...".format(file_path))
+            for before, after in load_text_file(clean_text_file(file_path), sep="\t", header=None, usecols=[1, 2], quoting=csv.QUOTE_NONE):
+                if after == "<self>" or after == "sil":
+                    after = before
+                if before not in summary_dict:
+                    summary_dict[before] = {}
+                if after not in summary_dict[before]:
+                    summary_dict[before][after] = 0
+                summary_dict[before][after] += 1
+        summary_dict.update(vanilla_summary_dict)
+
+        print("Generating lookup dict ...")
+        lookup_dict = {}
+        for before, after_dict in summary_dict.items():
+            after = max(after_dict.items(), key=operator.itemgetter(1))[0]
             lookup_dict[before] = after
+
+        print("Saving lookup file {} ...".format(LOOKUP_FILE_PATH))
+        lookup_file_content = pd.DataFrame(list(lookup_dict.items()), columns=["before", "after"])
+        lookup_file_content.to_csv(LOOKUP_FILE_PATH, sep="\t", index=False, encoding="utf-8")
 
     print("Loading {} ...".format(TEST_FILE_PATH))
     entry_list = []
