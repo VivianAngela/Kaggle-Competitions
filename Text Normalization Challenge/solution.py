@@ -81,7 +81,7 @@ def run():
 
     print("Writing submission ...")
     submission_file_content = pd.DataFrame(entry_list, columns=["id", "after"])
-    submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "{}.csv".format(time.strftime("%c")))
+    submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "{}.csv".format(time.strftime("%c")).replace(" ", "_").replace(":", "_"))
     submission_file_content.to_csv(submission_file_path, index=False, encoding="utf-8")
 
     print("All done!")
