@@ -1,0 +1,3 @@
+[submodule "Cdiscount Image Classification/DenseNet-Keras"]
+	path = Cdiscount Image Classification/DenseNet-Keras
+	url = https://github.com/flyyufelix/DenseNet-Keras.git
