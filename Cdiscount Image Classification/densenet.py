@@ -175,7 +175,7 @@ def dense_block(x, stage, nb_layers, nb_filter, growth_rate, dropout_rate=None, 
     return concat_feat, nb_filter
 
 def DenseNet(nb_dense_block=4, growth_rate=32, nb_filter=64, reduction=0.5,
-            dropout_rate=0.0, weight_decay=1e-4, classes=1000, weights_path=DEFAULT_WEIGHTS_PATH):
+            dropout_rate=0.0, weight_decay=1e-4, classes=1000, weights_path=DEFAULT_WEIGHTS_PATH, last_trainable_layer_name="pool4"):
     """Instantiate the DenseNet 121 architecture,
         # Arguments
             nb_dense_block: number of dense blocks to add to end
@@ -186,6 +186,7 @@ def DenseNet(nb_dense_block=4, growth_rate=32, nb_filter=64, reduction=0.5,
             weight_decay: weight decay factor
             classes: optional number of classes to classify images
             weights_path: path to pre-trained weights
+            last_trainable_layer_name: name of the last trainable layer
         # Returns
             A Keras model instance.
     """
@@ -244,6 +245,13 @@ def DenseNet(nb_dense_block=4, growth_rate=32, nb_filter=64, reduction=0.5,
     if weights_path is not None:
         print("Loading weights from {} ...".format(weights_path))
         model.load_weights(weights_path, by_name=True)
+
+    if last_trainable_layer_name is not None:
+        print("Freezing all layers until {} ...".format(last_trainable_layer_name))
+        for layer in model.layers:
+            layer.trainable = False
+            if layer.name == last_trainable_layer_name:
+                break
 
     return model
 
