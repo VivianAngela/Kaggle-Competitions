@@ -61,6 +61,53 @@ def append_entries_to_file(entry_list, file_path):
     file_content = pd.DataFrame(entry_list)
     file_content.to_csv(file_path, header=None, index=False, mode="a", float_format="%.2f", encoding="utf-8")
 
+def load_text_file(file_path, sep=",", header="infer", usecols=None, quoting=0, chunksize=1e4, encoding="utf-8"):
+    file_content = pd.read_csv(file_path, sep=sep, header=header, usecols=usecols, quoting=quoting, chunksize=chunksize, encoding=encoding)
+    for chunk in file_content:
+        for data in chunk.itertuples(index=False):
+            yield data
+
+def get_predictions_for_each_product(prediction_file_path):
+    accumulated_product_id = None
+    accumulated_label_index_and_prob_value_list = []
+    for data in load_text_file(prediction_file_path, header=None):
+        # Unpack the values
+        product_id = data[0]
+        label_index_and_prob_value_list = list(data[2:])
+
+        # Append the record if product_id is the same
+        if product_id == accumulated_product_id:
+            accumulated_label_index_and_prob_value_list += label_index_and_prob_value_list
+            continue
+
+        # Yield the accumulated records
+        if len(accumulated_label_index_and_prob_value_list) > 0:
+            yield accumulated_product_id, accumulated_label_index_and_prob_value_list
+
+        # Update the accumulated records
+        accumulated_product_id = product_id
+        accumulated_label_index_and_prob_value_list = label_index_and_prob_value_list
+
+    # Yield the accumulated records
+    if len(accumulated_label_index_and_prob_value_list) > 0:
+        yield accumulated_product_id, accumulated_label_index_and_prob_value_list
+
+def get_submission_from_prediction(prediction_file_path, label_index_to_category_id_dict, ensemble_func):
+    for product_id, label_index_and_prob_value_list in get_predictions_for_each_product(prediction_file_path):
+        label_index_to_prob_value_list_dict = {}
+        label_index_list = label_index_and_prob_value_list[0::2]
+        prob_value_list = label_index_and_prob_value_list[1::2]
+        for label_index, prob_value in zip(label_index_list, prob_value_list):
+            if label_index not in label_index_to_prob_value_list_dict:
+                label_index_to_prob_value_list_dict[label_index] = []
+            label_index_to_prob_value_list_dict[label_index].append(prob_value)
+
+        label_index_and_chosen_prob_value_array = np.array([(label_index, ensemble_func(prob_value_list)) for label_index, prob_value_list in label_index_to_prob_value_list_dict.items()])
+        chosen_label_index = label_index_and_chosen_prob_value_array[np.argmax(label_index_and_chosen_prob_value_array[:, 1]), 0].astype(np.int)
+        chosen_category_id = label_index_to_category_id_dict[chosen_label_index]
+
+        yield product_id, chosen_category_id
+
 def run():
     print("Creating folders ...")
     os.makedirs(SUBMISSION_FOLDER_PATH, exist_ok=True)
@@ -104,6 +151,31 @@ def run():
     if len(entry_list) > 0:
         append_entries_to_file(entry_list, prediction_file_path)
         entry_list = []
+
+    print("Loading label_index_to_category_id_dict ...")
+    label_index_to_category_id_dict = dict(pd.read_csv(os.path.join(HENGCHERKENG_FOLDER_PATH, "label_index_to_category_id.csv"), header=None).itertuples(index=False))
+
+    print("Generating submission files from prediction files ...")
+    for ensemble_name, ensemble_func in zip(["min", "max", "mean", "median"], [np.min, np.max, np.mean, np.median]):
+        submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "ensembling_{}_{}.csv".format(ensemble_name, time.strftime("%c")).replace(" ", "_").replace(":", "_"))
+        with open(submission_file_path, "w") as submission_file_object:
+            submission_file_object.write("_id,category_id\n")
+        print("Submission will be saved to {}".format(submission_file_path))
+
+        entry_list = []
+        for entry in get_submission_from_prediction(prediction_file_path, label_index_to_category_id_dict, ensemble_func):
+            # Append the results
+            entry_list.append(entry)
+
+            # Save submissions to disk
+            if len(entry_list) >= SAVE_EVERY_N_ENTRIES:
+                append_entries_to_file(entry_list, submission_file_path)
+                entry_list = []
+
+        # Save submissions to disk
+        if len(entry_list) > 0:
+            append_entries_to_file(entry_list, submission_file_path)
+            entry_list = []
 
     print("All done!")
 
