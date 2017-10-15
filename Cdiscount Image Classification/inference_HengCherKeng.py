@@ -67,13 +67,16 @@ def load_text_file(file_path, sep=",", header="infer", usecols=None, quoting=0, 
         for data in chunk.itertuples(index=False):
             yield data
 
-def get_predictions_for_each_product(prediction_file_path):
+def get_predictions_for_each_product(prediction_file_path_list):
     accumulated_product_id = None
     accumulated_label_index_and_prob_value_list = []
-    for data in load_text_file(prediction_file_path, header=None):
+    prediction_file_data_generator_list = [load_text_file(prediction_file_path, header=None) for prediction_file_path in prediction_file_path_list]
+    for data_tuple in zip(*prediction_file_data_generator_list):
         # Unpack the values
-        product_id = data[0]
-        label_index_and_prob_value_list = list(data[2:])
+        product_id = data_tuple[0][0]
+        label_index_and_prob_value_list = []
+        for data in data_tuple:
+            label_index_and_prob_value_list += list(data[2:])
 
         # Append the record if product_id is the same
         if product_id == accumulated_product_id:
@@ -92,8 +95,8 @@ def get_predictions_for_each_product(prediction_file_path):
     if len(accumulated_label_index_and_prob_value_list) > 0:
         yield accumulated_product_id, accumulated_label_index_and_prob_value_list
 
-def get_submission_from_prediction(prediction_file_path, label_index_to_category_id_dict, ensemble_func):
-    for product_id, label_index_and_prob_value_list in get_predictions_for_each_product(prediction_file_path):
+def get_submission_from_prediction(prediction_file_path_list, label_index_to_category_id_dict, ensemble_func):
+    for product_id, label_index_and_prob_value_list in get_predictions_for_each_product(prediction_file_path_list):
         label_index_to_prob_value_list_dict = {}
         label_index_list = label_index_and_prob_value_list[0::2]
         prob_value_list = label_index_and_prob_value_list[1::2]
@@ -163,7 +166,7 @@ def run():
         print("Submission will be saved to {}".format(submission_file_path))
 
         entry_list = []
-        for entry in get_submission_from_prediction(prediction_file_path, label_index_to_category_id_dict, ensemble_func):
+        for entry in get_submission_from_prediction([prediction_file_path], label_index_to_category_id_dict, ensemble_func):
             # Append the results
             entry_list.append(entry)
 
