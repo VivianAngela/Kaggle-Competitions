@@ -11,7 +11,7 @@ PROJECT_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset",
 VANILLA_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "vanilla")
 TRAIN_FILE_PATH = os.path.join(VANILLA_FOLDER_PATH, "train.csv")
 TEST_FILE_PATH = os.path.join(VANILLA_FOLDER_PATH, "test.csv")
-SAMPLE_NUM = 100000
+SAMPLE_NUM = None
 
 # Submission
 TEAM_NAME = "Aurora"
