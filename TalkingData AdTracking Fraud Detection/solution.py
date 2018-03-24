@@ -91,7 +91,7 @@ def run():
     valid_dataset = lgb.Dataset(valid_df.drop(target_name, axis=1), valid_df[target_name], categorical_feature=categorical_feature, reference=train_dataset)
 
     print("Performing the training procedure ...")
-    best_params = {"subsample": 0.9, "colsample_bytree": 0.9, "objective": "binary", "metric": "auc"}  # Use empirical parameters
+    best_params = {"subsample": 0.9, "colsample_bytree": 0.9, "objective": "binary", "metric": "auc", "is_unbalanced": True}  # Use empirical parameters
     model = lgb.train(params=best_params, train_set=train_dataset, valid_sets=[valid_dataset],
                     num_boost_round=NUM_BOOST_ROUND, early_stopping_rounds=EARLY_STOPPING_ROUNDS)
 
