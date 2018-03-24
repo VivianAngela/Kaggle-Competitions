@@ -21,6 +21,7 @@ os.makedirs(SUBMISSION_FOLDER_PATH, exist_ok=True)
 # Training and Testing procedure
 NUM_BOOST_ROUND = 1000000
 EARLY_STOPPING_ROUNDS = 100
+VERBOSE_EVAL = 10
 
 def load_data(nrows=SAMPLE_NUM):
     parse_dates = ["click_time"]
@@ -93,7 +94,7 @@ def run():
     print("Performing the training procedure ...")
     best_params = {"subsample": 0.9, "colsample_bytree": 0.9, "objective": "binary", "metric": "auc", "is_unbalanced": True}  # Use empirical parameters
     model = lgb.train(params=best_params, train_set=train_dataset, valid_sets=[valid_dataset],
-                    num_boost_round=NUM_BOOST_ROUND, early_stopping_rounds=EARLY_STOPPING_ROUNDS)
+                    num_boost_round=NUM_BOOST_ROUND, early_stopping_rounds=EARLY_STOPPING_ROUNDS, verbose_eval=VERBOSE_EVAL)
 
     print("Performing the testing procedure ...")
     prediction_array = model.predict(test_df, num_iteration=model.best_iteration)
