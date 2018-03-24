@@ -6,7 +6,7 @@ import lightgbm as lgb
 from sklearn.model_selection import train_test_split
 
 # Dataset
-PROJECT_NAME = os.path.basename(os.path.dirname(os.path.realpath(__file__)))
+PROJECT_NAME = "TalkingData AdTracking Fraud Detection"
 PROJECT_FOLDER_PATH = os.path.join(os.path.expanduser("~"), "Documents/Dataset", PROJECT_NAME)
 VANILLA_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "vanilla")
 TRAIN_FILE_PATH = os.path.join(VANILLA_FOLDER_PATH, "train.csv")
