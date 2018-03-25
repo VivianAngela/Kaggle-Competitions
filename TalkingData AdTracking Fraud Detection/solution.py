@@ -1,4 +1,5 @@
 import os
+import gc
 import datetime
 import numpy as np
 import pandas as pd
@@ -23,6 +24,10 @@ NUM_BOOST_ROUND = 1000000
 EARLY_STOPPING_ROUNDS = 100
 VERBOSE_EVAL = 10
 
+def release_resources():
+    unreachable_objects_num = gc.collect()
+    print("Collected {} unreachable objects ...".format(unreachable_objects_num))
+
 def load_data(nrows=SAMPLE_NUM):
     parse_dates = ["click_time"]
     dtype = {"ip": "uint32", "app": "uint16", "device": "uint16", "os": "uint16", "channel": "uint16", "is_attributed": "bool", "click_id": "uint32"}
@@ -39,6 +44,8 @@ def load_data(nrows=SAMPLE_NUM):
 
     print("Merging training data and testing data ...")
     merged_df = pd.concat([train_df, test_df], copy=False)
+    train_df, test_df = None, None
+    release_resources()
 
     print("Extracting date time info ...")
     merged_df["month"] = merged_df["click_time"].dt.month.astype("uint8")
@@ -49,35 +56,51 @@ def load_data(nrows=SAMPLE_NUM):
     print("Grouping by ip-day-hour ...")
     temp_df = merged_df[["ip", "day", "hour", "channel"]].groupby(by=["ip", "day", "hour"])[["channel"]].count().reset_index().rename(index=str, columns={"channel": "ip_tcount"})
     merged_df = merged_df.merge(temp_df, on=["ip", "day", "hour"], how="left")
+    temp_df = None
+    release_resources()
 
     print("Grouping by ip-app ...")
     temp_df = merged_df[["ip", "app", "channel"]].groupby(by=["ip", "app"])[["channel"]].count().reset_index().rename(index=str, columns={"channel": "ip_app_count"})
     merged_df = merged_df.merge(temp_df, on=["ip", "app"], how="left")
+    temp_df = None
+    release_resources()
 
     print("Grouping by ip-app-os ...")
     temp_df = merged_df[["ip", "app", "os", "channel"]].groupby(by=["ip", "app", "os"])[["channel"]].count().reset_index().rename(index=str, columns={"channel": "ip_app_os_count"})
     merged_df = merged_df.merge(temp_df, on=["ip", "app", "os"], how="left")
+    temp_df = None
+    release_resources()
 
     print("Grouping by ip_day_chl_var_hour ...")
     temp_df = merged_df[["ip", "day", "hour", "channel"]].groupby(by=["ip", "day", "channel"])[["hour"]].var().reset_index().rename(index=str, columns={"hour": "ip_tchan_count"})
     merged_df = merged_df.merge(temp_df, on=["ip", "day", "channel"], how="left")
+    temp_df = None
+    release_resources()
 
     print("Grouping by ip_app_os_var_hour ...")
     temp_df = merged_df[["ip", "app", "os", "hour"]].groupby(by=["ip", "app", "os"])[["hour"]].var().reset_index().rename(index=str, columns={"hour": "ip_app_os_var"})
     merged_df = merged_df.merge(temp_df, on=["ip", "app", "os"], how="left")
+    temp_df = None
+    release_resources()
 
     print("Grouping by ip_app_channel_var_day ...")
     temp_df = merged_df[["ip", "app", "channel", "day"]].groupby(by=["ip", "app", "channel"])[["day"]].var().reset_index().rename(index=str, columns={"day": "ip_app_channel_var_day"})
     merged_df = merged_df.merge(temp_df, on=["ip", "app", "channel"], how="left")
+    temp_df = None
+    release_resources()
 
     print("Grouping by ip_app_chl_mean_hour ...")
     temp_df = merged_df[["ip", "app", "channel", "hour"]].groupby(by=["ip", "app", "channel"])[["hour"]].mean().reset_index().rename(index=str, columns={"hour": "ip_app_channel_mean_hour"})
     merged_df = merged_df.merge(temp_df, on=["ip", "app", "channel"], how="left")
+    temp_df = None
+    release_resources()
 
     print("Splitting data ...")
     train_indexes, valid_indexes = train_test_split(np.arange(train_num), test_size=0.1, random_state=0)
     train_df, valid_df = merged_df.iloc[train_indexes], merged_df.iloc[valid_indexes]
     test_df = merged_df.iloc[train_num:].drop("is_attributed", axis=1)
+    merged_df = None
+    release_resources()
 
     return train_df, valid_df, test_df, submission_df
 
@@ -89,7 +112,11 @@ def run():
     target_name = "is_attributed"
     categorical_feature = ["app", "channel", "device", "os", "month", "day", "hour"]
     train_dataset = lgb.Dataset(train_df.drop(target_name, axis=1), train_df[target_name], categorical_feature=categorical_feature)
+    train_df = None
+    release_resources()
     valid_dataset = lgb.Dataset(valid_df.drop(target_name, axis=1), valid_df[target_name], categorical_feature=categorical_feature, reference=train_dataset)
+    valid_df = None
+    release_resources()
 
     print("Performing the training procedure ...")
     best_params = {"subsample": 0.9, "colsample_bytree": 0.9, "objective": "binary", "metric": "auc", "is_unbalance": True}  # Use empirical parameters
