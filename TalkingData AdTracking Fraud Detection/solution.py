@@ -102,6 +102,10 @@ def load_data(nrows=SAMPLE_NUM):
     merged_df = None
     release_resources()
 
+    print("Getting summary of train_df, valid_df and test_df ...")
+    for current_df in [train_df, valid_df, test_df]:
+        current_df.info(verbose=False, memory_usage=True)
+
     return train_df, valid_df, test_df, submission_df
 
 def run():
