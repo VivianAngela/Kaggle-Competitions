@@ -136,7 +136,7 @@ def run():
     submission_df["is_attributed"] = prediction_array
     submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "{} {}.csv".format(TEAM_NAME, str(datetime.datetime.now()).split(".")[0]).replace(" ", "_"))
     print("Saving submission to {} ...".format(submission_file_path))
-    submission_df.to_csv(submission_file_path, index=False)
+    submission_df.to_csv(submission_file_path, float_format="%.6f", index=False)
     compressed_submission_file_path = create_zip_archive(submission_file_path)
     print("Saving compressed submission to {} ...".format(compressed_submission_file_path))
 

@@ -43,7 +43,7 @@ def run():
     ensemble_df["is_attributed"] = apply_normalization(ensemble_prediction_array)
     ensemble_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "{} {} {}.csv".format(TEAM_NAME, KEYWORD, str(datetime.datetime.now()).split(".")[0]).replace(" ", "_"))
     print("Saving submission to {} ...".format(ensemble_file_path))
-    ensemble_df.to_csv(ensemble_file_path, index=False)
+    ensemble_df.to_csv(ensemble_file_path, float_format="%.6f", index=False)
     compressed_ensemble_file_path = create_zip_archive(ensemble_file_path)
     print("Saving compressed submission to {} ...".format(compressed_ensemble_file_path))
 
