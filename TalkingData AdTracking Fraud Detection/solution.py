@@ -1,5 +1,6 @@
 import os
 import gc
+import shutil
 import datetime
 import numpy as np
 import pandas as pd
@@ -23,6 +24,9 @@ os.makedirs(SUBMISSION_FOLDER_PATH, exist_ok=True)
 NUM_BOOST_ROUND = 1000000
 EARLY_STOPPING_ROUNDS = 50
 VERBOSE_EVAL = 10
+
+# Generate a zip archive for a file
+create_zip_archive = lambda file_path: shutil.make_archive(file_path[:file_path.rindex(".")], "zip", os.path.abspath(os.path.join(file_path, "..")), os.path.basename(file_path))
 
 def release_resources():
     unreachable_objects_num = gc.collect()
@@ -133,6 +137,8 @@ def run():
     submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "{} {}.csv".format(TEAM_NAME, str(datetime.datetime.now()).split(".")[0]).replace(" ", "_"))
     print("Saving submission to {} ...".format(submission_file_path))
     submission_df.to_csv(submission_file_path, index=False)
+    compressed_submission_file_path = create_zip_archive(submission_file_path)
+    print("Saving compressed submission to {} ...".format(compressed_submission_file_path))
 
     print("All done!")
 

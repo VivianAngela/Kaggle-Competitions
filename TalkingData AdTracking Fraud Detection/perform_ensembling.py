@@ -1,5 +1,6 @@
 import os
 import glob
+import shutil
 import datetime
 import numpy as np
 import pandas as pd
@@ -16,6 +17,9 @@ os.makedirs(SUBMISSION_FOLDER_PATH, exist_ok=True)
 # Ensembling
 WORKSPACE_FOLDER_PATH = os.path.join(PROJECT_FOLDER_PATH, "script/Mar_25_3")
 KEYWORD = "DL"
+
+# Generate a zip archive for a file
+create_zip_archive = lambda file_path: shutil.make_archive(file_path[:file_path.rindex(".")], "zip", os.path.abspath(os.path.join(file_path, "..")), os.path.basename(file_path))
 
 def run():
     print("Searching for submissions with keyword {} at {} ...".format(KEYWORD, WORKSPACE_FOLDER_PATH))
@@ -40,6 +44,8 @@ def run():
     ensemble_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "{} {} {}.csv".format(TEAM_NAME, KEYWORD, str(datetime.datetime.now()).split(".")[0]).replace(" ", "_"))
     print("Saving submission to {} ...".format(ensemble_file_path))
     ensemble_df.to_csv(ensemble_file_path, index=False)
+    compressed_ensemble_file_path = create_zip_archive(ensemble_file_path)
+    print("Saving compressed submission to {} ...".format(compressed_ensemble_file_path))
 
     print("All done!")
 
