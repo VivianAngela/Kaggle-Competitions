@@ -37,7 +37,7 @@ def run():
     ensemble_prediction_array = np.mean(ranking_array_list, axis=0)
     apply_normalization = lambda data_array: 1.0 * (data_array - np.min(data_array)) / (np.max(data_array) - np.min(data_array))
     ensemble_df["is_attributed"] = apply_normalization(ensemble_prediction_array)
-    ensemble_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "{} {} {}.csv".format(TEAM_NAME, KEYWORD, str(datetime.datetime.now()).split(".")[0]))
+    ensemble_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "{} {} {}.csv".format(TEAM_NAME, KEYWORD, str(datetime.datetime.now()).split(".")[0]).replace(" ", "_"))
     print("Saving submission to {} ...".format(ensemble_file_path))
     ensemble_df.to_csv(ensemble_file_path, index=False)
 

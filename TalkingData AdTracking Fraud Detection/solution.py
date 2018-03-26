@@ -130,7 +130,7 @@ def run():
     print("Performing the testing procedure ...")
     prediction_array = model.predict(test_df, num_iteration=model.best_iteration)
     submission_df["is_attributed"] = prediction_array
-    submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "{} {}.csv".format(TEAM_NAME, str(datetime.datetime.now()).split(".")[0]))
+    submission_file_path = os.path.join(SUBMISSION_FOLDER_PATH, "{} {}.csv".format(TEAM_NAME, str(datetime.datetime.now()).split(".")[0]).replace(" ", "_"))
     print("Saving submission to {} ...".format(submission_file_path))
     submission_df.to_csv(submission_file_path, index=False)
 
