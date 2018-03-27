@@ -118,7 +118,7 @@ def run():
 
     print("Generating LightGBM datasets ...")
     target_name = "is_attributed"
-    categorical_feature = ["app", "channel", "device", "os", "month", "day", "hour"]
+    categorical_feature = ["ip", "app", "device", "os", "channel"]
     train_dataset = lgb.Dataset(train_df.drop(target_name, axis=1), train_df[target_name], categorical_feature=categorical_feature)
     train_df = None
     release_resources()
