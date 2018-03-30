@@ -52,7 +52,6 @@ def load_data(nrows=SAMPLE_NUM):
     release_resources()
 
     print("Extracting date time info ...")
-    merged_df["month"] = merged_df["click_time"].dt.month.astype("uint8")
     merged_df["day"] = merged_df["click_time"].dt.day.astype("uint8")
     merged_df["hour"] = merged_df["click_time"].dt.hour.astype("uint8")
     merged_df.drop("click_time", axis=1, inplace=True)
